@@ -79,8 +79,9 @@ async def main() -> None:
             t0 = time.time()
             await submit_tasks(client, count=count)
             total_submitted += count
-            print(f"  Submitted {count} tasks in {time.time() - t0:.1f}s "
-                  f"(total: {total_submitted})")
+            print(
+                f"  Submitted {count} tasks in {time.time() - t0:.1f}s (total: {total_submitted})"
+            )
 
             # Wait until queue is nearly drained before next wave
             # This gives the model time to learn from completions
