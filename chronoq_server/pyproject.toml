@@ -1,0 +1,22 @@
+[project]
+name = "chronoq-server"
+version = "0.1.0"
+description = "Self-optimizing task queue with ML-based SJF scheduling"
+requires-python = ">=3.11"
+dependencies = [
+    "chronoq-predictor",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "redis>=5.0",
+    "loguru>=0.7",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["chronoq_server"]
+
+[tool.uv.sources]
+chronoq-predictor = { workspace = true }
