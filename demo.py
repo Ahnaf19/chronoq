@@ -1,4 +1,4 @@
-"""Demo script: submit tasks, watch SJF scheduling and model promotion in action."""
+"""Demo script: submit tasks in waves, watch SJF scheduling and model promotion in action."""
 
 import asyncio
 import random
@@ -10,8 +10,16 @@ BASE_URL = "http://localhost:8000"
 
 TASK_TYPES = ["resize_image", "send_email", "generate_report", "compress_file", "run_inference"]
 
+# Submit in 4 waves so later waves benefit from the trained model
+WAVES = [
+    {"count": 60, "label": "Wave 1 (cold start)"},
+    {"count": 60, "label": "Wave 2 (heuristic learning)"},
+    {"count": 40, "label": "Wave 3 (post-promotion)"},
+    {"count": 40, "label": "Wave 4 (gradient boosting)"},
+]
 
-async def submit_tasks(client: httpx.AsyncClient, count: int = 200) -> list[dict]:
+
+async def submit_tasks(client: httpx.AsyncClient, count: int) -> list[dict]:
     """Submit a batch of random tasks."""
     tasks = []
     for _ in range(count):
@@ -43,40 +51,79 @@ def print_metrics(metrics: dict, elapsed: float) -> None:
     print(f"  Avg utilization: {avg_util:.1f}%")
 
 
+async def wait_for_queue_below(client: httpx.AsyncClient, threshold: int, start: float) -> dict:
+    """Poll until queue depth drops below threshold. Returns last metrics."""
+    while True:
+        await asyncio.sleep(2.0)
+        resp = await client.get(f"{BASE_URL}/metrics")
+        metrics = resp.json()
+        print_metrics(metrics, time.time() - start)
+        if metrics.get("queue_depth", threshold + 1) <= threshold:
+            return metrics
+        if time.time() - start > 300:
+            print("\nTimeout after 5 minutes")
+            return metrics
+
+
 async def main() -> None:
     async with httpx.AsyncClient(timeout=30.0) as client:
-        print("Submitting 200 tasks...")
         start = time.time()
-        tasks = await submit_tasks(client, count=200)
-        print(f"Submitted {len(tasks)} tasks in {time.time() - start:.1f}s")
+        total_submitted = 0
 
-        # Poll metrics until queue is drained
+        for wave in WAVES:
+            count = wave["count"]
+            label = wave["label"]
+            print(f"\n{'=' * 55}")
+            print(f"  {label}: submitting {count} tasks...")
+            print(f"{'=' * 55}")
+            t0 = time.time()
+            await submit_tasks(client, count=count)
+            total_submitted += count
+            print(f"  Submitted {count} tasks in {time.time() - t0:.1f}s "
+                  f"(total: {total_submitted})")
+
+            # Wait until queue is nearly drained before next wave
+            # This gives the model time to learn from completions
+            await wait_for_queue_below(client, threshold=5, start=start)
+
+        # Wait for final drain
+        print(f"\n{'=' * 55}")
+        print("  Waiting for queue to fully drain...")
+        print(f"{'=' * 55}")
         while True:
             await asyncio.sleep(2.0)
-            elapsed = time.time() - start
-
             resp = await client.get(f"{BASE_URL}/metrics")
-            if resp.status_code != 200:
-                print(f"Metrics fetch failed: {resp.status_code}")
-                continue
-
             metrics = resp.json()
-            print_metrics(metrics, elapsed)
-
+            print_metrics(metrics, time.time() - start)
             if metrics.get("queue_depth", 1) == 0:
                 print("\nQueue drained!")
                 break
-
-            if elapsed > 300:
+            if time.time() - start > 300:
                 print("\nTimeout after 5 minutes")
                 break
 
         # Final predictions comparison
-        resp = await client.get(f"{BASE_URL}/metrics/predictions")
+        resp = await client.get(f"{BASE_URL}/metrics/predictions?n=200")
         if resp.status_code == 200:
             predictions = resp.json()
             if predictions:
-                print(f"\n--- Prediction Accuracy ({len(predictions)} samples) ---")
+                # Split into early (heuristic) vs late (gradient boosting) predictions
+                mid = len(predictions) // 2
+                early = predictions[:mid]
+                late = predictions[mid:]
+
+                early_mae = sum(p["error_ms"] for p in early) / len(early) if early else 0
+                late_mae = sum(p["error_ms"] for p in late) / len(late) if late else 0
+
+                print(f"\n{'=' * 65}")
+                print(f"  Prediction Accuracy Summary ({len(predictions)} total samples)")
+                print(f"{'=' * 65}")
+                print(f"  Early predictions MAE (heuristic):          {early_mae:>8.0f} ms")
+                print(f"  Late predictions MAE  (gradient boosting):  {late_mae:>8.0f} ms")
+                improvement = ((early_mae - late_mae) / early_mae * 100) if early_mae > 0 else 0
+                print(f"  Improvement:                                {improvement:>7.1f}%")
+
+                print("\n--- Last 20 predictions (gradient boosting) ---")
                 print(f"{'Task Type':<20} {'Predicted':>10} {'Actual':>10} {'Error':>10}")
                 print("-" * 55)
                 for p in predictions[-20:]:

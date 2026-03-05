@@ -72,7 +72,7 @@ async def trigger_retrain(request: Request) -> dict:
 
 
 @router.get("/predictions")
-async def get_predictions(request: Request) -> list[dict]:
+async def get_predictions(request: Request, n: int = 50) -> list[dict]:
     """Recent prediction-vs-actual history."""
     tracker: PredictionTracker = request.app.state.prediction_tracker
-    return tracker.recent(n=50)
+    return tracker.recent(n=n)
