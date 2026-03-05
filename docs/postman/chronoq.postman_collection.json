@@ -1,0 +1,278 @@
+{
+  "info": {
+    "name": "Chronoq API",
+    "description": "Self-optimizing task queue with ML-based SJF scheduling",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "Submit Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.environment.set('task_id', jsonData.task_id);",
+                  "",
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has task_id', function () {",
+                  "    pm.expect(jsonData).to.have.property('task_id');",
+                  "});",
+                  "",
+                  "pm.test('Has predicted_ms', function () {",
+                  "    pm.expect(jsonData.predicted_ms).to.be.above(0);",
+                  "});",
+                  "",
+                  "pm.test('Has model_type', function () {",
+                  "    pm.expect(jsonData.model_type).to.be.oneOf(['heuristic', 'gradient_boosting']);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_type\": \"resize_image\",\n  \"payload_size\": 2048,\n  \"metadata\": {\"source\": \"postman-test\"}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["tasks"]
+            },
+            "description": "Submit a single task for SJF-scheduled execution. The response includes the predicted execution time and the current model type."
+          }
+        },
+        {
+          "name": "Submit Batch",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Returns array of 3', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array').with.lengthOf(3);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tasks\": [\n    {\"task_type\": \"resize_image\", \"payload_size\": 2048},\n    {\"task_type\": \"send_email\", \"payload_size\": 512},\n    {\"task_type\": \"generate_report\", \"payload_size\": 10000}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/batch",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "batch"]
+            },
+            "description": "Submit multiple tasks in one request."
+          }
+        },
+        {
+          "name": "Get Task Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has task_type', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('task_type');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}"]
+            },
+            "description": "Get task status and details by ID. Uses the task_id captured from Submit Task."
+          }
+        },
+        {
+          "name": "Queue Snapshot",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Returns array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["tasks"]
+            },
+            "description": "View pending tasks in SJF order (shortest predicted first)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Metrics",
+      "item": [
+        {
+          "name": "System Metrics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "",
+                  "pm.test('Has queue_depth', function () {",
+                  "    pm.expect(jsonData).to.have.property('queue_depth');",
+                  "});",
+                  "",
+                  "pm.test('Has prediction info', function () {",
+                  "    pm.expect(jsonData).to.have.property('prediction');",
+                  "    pm.expect(jsonData.prediction).to.have.property('model_type');",
+                  "});",
+                  "",
+                  "pm.test('Has workers', function () {",
+                  "    pm.expect(jsonData.workers).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/metrics",
+              "host": ["{{base_url}}"],
+              "path": ["metrics"]
+            },
+            "description": "System-wide metrics: queue depth, predictor model info, worker utilization."
+          }
+        },
+        {
+          "name": "Trigger Retrain",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "",
+                  "pm.test('Has mae', function () {",
+                  "    pm.expect(jsonData).to.have.property('mae');",
+                  "});",
+                  "",
+                  "pm.test('Has model_version', function () {",
+                  "    pm.expect(jsonData).to.have.property('model_version');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/metrics/retrain",
+              "host": ["{{base_url}}"],
+              "path": ["metrics", "retrain"]
+            },
+            "description": "Manually trigger predictor model retrain. Returns new model metrics."
+          }
+        },
+        {
+          "name": "Prediction History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Returns array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/metrics/predictions",
+              "host": ["{{base_url}}"],
+              "path": ["metrics", "predictions"]
+            },
+            "description": "Recent prediction-vs-actual accuracy history for monitoring model performance."
+          }
+        }
+      ]
+    }
+  ]
+}
