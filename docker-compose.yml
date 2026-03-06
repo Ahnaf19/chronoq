@@ -3,6 +3,8 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+
+  # Production: built image
   chronoq:
     build: .
     ports:
@@ -11,3 +13,22 @@ services:
       - redis
     environment:
       - REDIS_URL=redis://redis:6379/0
+    profiles:
+      - prod
+
+  # Development: mount source code, auto-reload on changes
+  chronoq-dev:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./chronoq_predictor:/app/chronoq_predictor
+      - ./chronoq_server:/app/chronoq_server
+      - ./demo.py:/app/demo.py
+    command: uv run uvicorn chronoq_server.main:app --host 0.0.0.0 --port 8000 --reload
+    profiles:
+      - dev
