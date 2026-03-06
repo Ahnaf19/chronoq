@@ -5,12 +5,11 @@ from unittest.mock import AsyncMock, patch
 
 import fakeredis.aioredis
 import pytest
+from chronoq_predictor import PredictorConfig, TaskPredictor
 from chronoq_predictor.storage.memory import MemoryStore
 from chronoq_server.core.queue import TaskQueue
 from chronoq_server.core.scheduler import Scheduler
 from chronoq_server.core.worker import WorkerPool
-
-from chronoq_predictor import PredictorConfig, TaskPredictor
 
 
 @pytest.fixture

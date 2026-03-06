@@ -3,6 +3,7 @@
 import asyncio
 
 from chronoq_predictor import PredictionResult, TaskPredictor
+
 from chronoq_server.core.queue import TaskQueue
 
 

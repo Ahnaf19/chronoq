@@ -3,10 +3,10 @@
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
+from chronoq_predictor import PredictorConfig, TaskPredictor
 from fastapi import FastAPI
 from loguru import logger
 
-from chronoq_predictor import PredictorConfig, TaskPredictor
 from chronoq_server.api.metrics import PredictionTracker
 from chronoq_server.api.metrics import router as metrics_router
 from chronoq_server.api.tasks import router as tasks_router

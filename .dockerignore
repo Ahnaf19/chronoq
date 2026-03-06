@@ -14,7 +14,7 @@ docs/
 migrations/
 *.db
 *.md
-!chronoq_predictor/pyproject.toml
-!chronoq_server/pyproject.toml
+!predictor/pyproject.toml
+!server/pyproject.toml
 !pyproject.toml
 .DS_Store

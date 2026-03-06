@@ -6,10 +6,10 @@ Self-optimizing task queue with ML-based Shortest Job First (SJF) scheduling.
 
 ```
 chronoq/
-├── chronoq_predictor/          # Layer 1: standalone ML predictor library
-│   └── chronoq_predictor/      # Package source (predict/record/retrain)
-├── chronoq_server/             # Layer 2: FastAPI + Redis SJF queue server
-│   └── chronoq_server/         # Package source (queue/scheduler/workers/api)
+├── predictor/                  # Layer 1: standalone ML predictor library
+│   └── chronoq_predictor/      # Python package (predict/record/retrain)
+├── server/                     # Layer 2: FastAPI + Redis SJF queue server
+│   └── chronoq_server/         # Python package (queue/scheduler/workers/api)
 ├── tests/
 │   ├── predictor/              # 47 tests — schemas, storage, models, predictor, integration
 │   └── server/                 # 24 tests — queue, scheduler, worker, API, integration
@@ -23,7 +23,7 @@ chronoq/
 
 ## Critical Boundaries
 
-- **chronoq-predictor MUST NEVER import from chronoq-server.** It is a standalone library with zero Redis/FastAPI/queue dependencies. Verify: `grep -r "chronoq_server" chronoq_predictor/` must return nothing.
+- **chronoq-predictor MUST NEVER import from chronoq-server.** It is a standalone library with zero Redis/FastAPI/queue dependencies. Verify: `grep -r "chronoq_server" predictor/` must return nothing.
 - **chronoq-server depends on chronoq-predictor** via uv workspace source resolution (`[tool.uv.sources]` in its pyproject.toml).
 - Run `/boundary-check` to verify this at any time.
 
@@ -77,21 +77,21 @@ These are defined in `.claude/commands/` and available via `/command-name`:
 ## Key Files for Common Tasks
 
 ### Modifying the predictor
-- Public API: `chronoq_predictor/chronoq_predictor/predictor.py` (TaskPredictor class)
-- Schemas: `chronoq_predictor/chronoq_predictor/schemas.py` (TaskRecord, PredictionResult, RetrainResult)
-- Config: `chronoq_predictor/chronoq_predictor/config.py` (PredictorConfig dataclass)
-- Models: `chronoq_predictor/chronoq_predictor/models/heuristic.py` and `gradient.py`
-- Storage: `chronoq_predictor/chronoq_predictor/storage/sqlite.py` and `memory.py`
-- Exports: `chronoq_predictor/chronoq_predictor/__init__.py` — update `__all__` when adding public types
+- Public API: `predictor/chronoq_predictor/predictor.py` (TaskPredictor class)
+- Schemas: `predictor/chronoq_predictor/schemas.py` (TaskRecord, PredictionResult, RetrainResult)
+- Config: `predictor/chronoq_predictor/config.py` (PredictorConfig dataclass)
+- Models: `predictor/chronoq_predictor/models/heuristic.py` and `gradient.py`
+- Storage: `predictor/chronoq_predictor/storage/sqlite.py` and `memory.py`
+- Exports: `predictor/chronoq_predictor/__init__.py` — update `__all__` when adding public types
 
 ### Modifying the server
-- App entrypoint: `chronoq_server/chronoq_server/main.py` (FastAPI lifespan, router mounting)
-- Config: `chronoq_server/chronoq_server/config.py` (ServerConfig, env var mapping)
-- Queue: `chronoq_server/chronoq_server/core/queue.py` (Redis sorted set operations)
-- Scheduler: `chronoq_server/chronoq_server/core/scheduler.py` (bridges predictor ↔ queue)
-- Workers: `chronoq_server/chronoq_server/core/worker.py` (async worker pool)
-- API routes: `chronoq_server/chronoq_server/api/tasks.py` and `api/metrics.py`
-- Task simulation: `chronoq_server/chronoq_server/task_registry.py`
+- App entrypoint: `server/chronoq_server/main.py` (FastAPI lifespan, router mounting)
+- Config: `server/chronoq_server/config.py` (ServerConfig, env var mapping)
+- Queue: `server/chronoq_server/core/queue.py` (Redis sorted set operations)
+- Scheduler: `server/chronoq_server/core/scheduler.py` (bridges predictor ↔ queue)
+- Workers: `server/chronoq_server/core/worker.py` (async worker pool)
+- API routes: `server/chronoq_server/api/tasks.py` and `api/metrics.py`
+- Task simulation: `server/chronoq_server/task_registry.py`
 
 ### Adding tests
 - Shared fixtures: `tests/conftest.py` (memory_store, predictor_config with low thresholds)
@@ -139,7 +139,7 @@ Use the Agent tool for tasks that benefit from parallel exploration or deep code
 ## Workflow: Common Scenarios
 
 ### Adding a new API endpoint
-1. Add route in `chronoq_server/chronoq_server/api/tasks.py` or `api/metrics.py`
+1. Add route in `server/chronoq_server/api/tasks.py` or `api/metrics.py`
 2. Add Pydantic request/response models in the same file (or schemas.py if shared)
 3. Wire up in `main.py` if adding a new router
 4. Add test in `tests/server/test_api_*.py`
@@ -147,14 +147,14 @@ Use the Agent tool for tasks that benefit from parallel exploration or deep code
 6. Run `/sync-docs` to update api-reference.md and Postman collection
 
 ### Adding a new storage backend
-1. Create `chronoq_predictor/chronoq_predictor/storage/newbackend.py` implementing `TelemetryStore`
+1. Create `predictor/chronoq_predictor/storage/newbackend.py` implementing `TelemetryStore`
 2. Add URI dispatch in `storage/__init__.py` `create_store()`
 3. Add tests in `tests/predictor/test_newbackend_storage.py`
 4. Run `/boundary-check` to verify no server imports leaked in
 5. Update docs/configuration.md with the new URI pattern
 
 ### Adding a new model type
-1. Create `chronoq_predictor/chronoq_predictor/models/newmodel.py` extending `BaseEstimator`
+1. Create `predictor/chronoq_predictor/models/newmodel.py` extending `BaseEstimator`
 2. Update promotion logic in `predictor.py` `retrain()` method
 3. Add `model_type` string to `PredictionResult.model_type` Literal in schemas.py
 4. Add tests in `tests/predictor/test_newmodel.py`

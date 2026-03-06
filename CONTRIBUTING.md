@@ -21,8 +21,8 @@ uv run ruff check .
 
 This is a uv workspace monorepo with two packages:
 
-- `chronoq_predictor/` — standalone ML library (no Redis/FastAPI dependency)
-- `chronoq_server/` — task queue server (depends on chronoq-predictor)
+- `predictor/` — standalone ML library (no Redis/FastAPI dependency)
+- `server/` — task queue server (depends on chronoq-predictor)
 
 Tests live in `tests/predictor/` and `tests/server/` respectively.
 

@@ -77,7 +77,7 @@ uv sync
 <summary><strong>Predictor library only (no Redis needed)</strong></summary>
 
 ```bash
-pip install ./chronoq_predictor
+pip install ./predictor
 ```
 
 Drop it into any existing project — Celery workers, Kafka consumers, FastAPI background tasks, or custom job runners.
@@ -259,15 +259,15 @@ The two layers are independently deployable. The predictor library has **zero de
 
 ```
 chronoq/
-├── chronoq_predictor/          # Layer 1 — standalone ML library
-│   └── chronoq_predictor/
+├── predictor/                  # Layer 1 — standalone ML library
+│   └── chronoq_predictor/      # Python package (pip-installable)
 │       ├── predictor.py        # TaskPredictor: predict / record / retrain
 │       ├── models/             # HeuristicEstimator + GradientEstimator
 │       ├── storage/            # SQLite + in-memory backends
 │       ├── schemas.py          # Pydantic models
 │       └── features.py         # Feature extraction
-├── chronoq_server/             # Layer 2 — queue system
-│   └── chronoq_server/
+├── server/                     # Layer 2 — queue system
+│   └── chronoq_server/         # Python package
 │       ├── main.py             # FastAPI app with async lifespan
 │       ├── core/               # Queue (Redis), Scheduler, Worker pool
 │       └── api/                # REST endpoints

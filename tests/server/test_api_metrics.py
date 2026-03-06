@@ -2,14 +2,13 @@
 
 import fakeredis.aioredis
 import pytest
+from chronoq_predictor import PredictorConfig, TaskPredictor
 from chronoq_predictor.storage.memory import MemoryStore
 from chronoq_server.api.metrics import PredictionTracker
 from chronoq_server.core.queue import TaskQueue
 from chronoq_server.core.scheduler import Scheduler
 from chronoq_server.core.worker import WorkerPool
 from httpx import ASGITransport, AsyncClient
-
-from chronoq_predictor import PredictorConfig, TaskPredictor
 
 
 def _create_test_app():

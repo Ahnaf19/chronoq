@@ -1,5 +1,5 @@
 [tool.uv.workspace]
-members = ["chronoq_predictor", "chronoq_server"]
+members = ["predictor", "server"]
 
 [tool.uv]
 dev-dependencies = [
