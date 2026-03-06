@@ -4,40 +4,187 @@ Self-optimizing task queue with ML-based Shortest Job First (SJF) scheduling.
 
 ## Monorepo Layout
 
-- `chronoq_predictor/` — standalone pip-installable ML predictor library (zero Redis/FastAPI deps)
-- `chronoq_server/` — full task queue: Redis sorted set SJF queue, async workers, FastAPI API
-- `tests/predictor/` — predictor unit + integration tests
-- `tests/server/` — server unit + integration tests (fakeredis)
+```
+chronoq/
+├── chronoq_predictor/          # Layer 1: standalone ML predictor library
+│   └── chronoq_predictor/      # Package source (predict/record/retrain)
+├── chronoq_server/             # Layer 2: FastAPI + Redis SJF queue server
+│   └── chronoq_server/         # Package source (queue/scheduler/workers/api)
+├── tests/
+│   ├── predictor/              # 47 tests — schemas, storage, models, predictor, integration
+│   └── server/                 # 24 tests — queue, scheduler, worker, API, integration
+├── migrations/                 # Alembic schema migrations for SQLite telemetry
+├── docs/                       # Architecture, user guide, API reference, config, Postman
+├── .claude/commands/           # Custom slash commands (see below)
+├── demo.py                     # End-to-end demo (wave-based submission)
+├── docker-compose.yml          # Redis + app
+└── Dockerfile
+```
+
+## Critical Boundaries
+
+- **chronoq-predictor MUST NEVER import from chronoq-server.** It is a standalone library with zero Redis/FastAPI/queue dependencies. Verify: `grep -r "chronoq_server" chronoq_predictor/` must return nothing.
+- **chronoq-server depends on chronoq-predictor** via uv workspace source resolution (`[tool.uv.sources]` in its pyproject.toml).
+- Run `/boundary-check` to verify this at any time.
 
 ## Tech Stack
 
-- Python 3.11, uv workspace
-- Pydantic v2 for schemas, scikit-learn for ML, loguru for logging
-- FastAPI + uvicorn for API, redis-py async for queue
-- pytest + pytest-asyncio for tests, fakeredis for Redis mocking
+- **Python 3.11**, uv workspace monorepo (root pyproject.toml defines workspace members)
+- **Predictor**: Pydantic v2 (schemas), scikit-learn (GradientBoostingRegressor), loguru (logging), sqlite3 stdlib (storage)
+- **Server**: FastAPI + uvicorn (API), redis-py async (sorted set queue), loguru
+- **Testing**: pytest + pytest-asyncio (asyncio_mode="auto"), fakeredis[lua] (no real Redis needed), httpx (FastAPI test client)
+- **Linting**: Ruff — `line-length=100`, `target-version="py311"`, `select=["E","F","W","I","N","UP","B","A","SIM","TCH"]`, double quotes
+- **CI**: GitHub Actions (`.github/workflows/ci.yml`) — lint + test on push/PR to main
 
 ## Conventions
 
-- Ruff: line-length=100, target-version="py311", double quotes
-- Type hints on all public functions, `X | None` union style
-- Google-style docstrings on public classes/methods
-- `datetime.now(timezone.utc)` for timestamps
-- Thread safety via `threading.Lock` on shared state (predictor estimator reference)
+- Type hints on all public functions. Use `X | None` union style, never `Optional[X]`.
+- Google-style docstrings on public classes and methods.
+- `from __future__ import annotations` where needed for forward refs. Type-only imports in `TYPE_CHECKING` blocks.
+- `datetime.now(UTC)` for timestamps (using `datetime.UTC`).
+- Thread safety: `threading.Lock` protects only `_estimator` reference swap in `predictor.py`. Fitting happens outside the lock.
+- Storage: `SqliteStore` uses its own `threading.Lock` + `check_same_thread=False`.
+- Async workers: `asyncio.to_thread()` for blocking predictor calls (retrain) from async context.
+- Commit messages: conventional prefixes (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `style:`, `ci:`).
 
 ## Commands
 
 ```bash
-uv sync                         # install all deps
-uv run pytest -v                # run all tests
-uv run pytest tests/predictor/  # predictor tests only
-uv run pytest tests/server/     # server tests only
-uv run ruff check .             # lint
-uv run ruff format .            # format
+uv sync                                  # Install all deps (workspace)
+uv run pytest -v                         # All 71 tests
+uv run pytest tests/predictor/ -v        # Predictor tests only (47)
+uv run pytest tests/server/ -v           # Server tests only (24)
+uv run pytest --cov=chronoq_predictor --cov=chronoq_server  # With coverage
+uv run ruff check .                      # Lint
+uv run ruff check . --fix                # Lint with auto-fix
+uv run ruff format .                     # Format
+uv run ruff format --check .             # Format check (CI uses this)
 ```
 
-## Architecture
+## Custom Slash Commands
 
-1. Client submits task → predictor estimates duration → task enters Redis sorted set (score = predicted_ms)
-2. Workers pop lowest-score task (SJF) → execute → record actual time → predictor learns
-3. After cold_start_threshold records, predictor auto-promotes heuristic → GradientBoosting
-4. Auto-retrain every retrain_every_n new records
+These are defined in `.claude/commands/` and available via `/command-name`:
+
+| Command | Purpose |
+|---------|---------|
+| `/validate` | Full validation: lint + format check + all tests. Diagnoses failures. |
+| `/test [scope]` | Run tests by scope: `predictor`, `server`, a name pattern, or all. |
+| `/fix` | Auto-fix lint/format issues, verify tests still pass, show diff. |
+| `/boundary-check` | Verify chronoq-predictor has zero imports from chronoq-server/Redis/FastAPI. |
+| `/sync-docs` | Check docs against code for staleness: API routes, config, Postman, test counts. |
+| `/coverage` | Run tests with coverage, identify untested code, suggest high-impact tests. |
+
+## Key Files for Common Tasks
+
+### Modifying the predictor
+- Public API: `chronoq_predictor/chronoq_predictor/predictor.py` (TaskPredictor class)
+- Schemas: `chronoq_predictor/chronoq_predictor/schemas.py` (TaskRecord, PredictionResult, RetrainResult)
+- Config: `chronoq_predictor/chronoq_predictor/config.py` (PredictorConfig dataclass)
+- Models: `chronoq_predictor/chronoq_predictor/models/heuristic.py` and `gradient.py`
+- Storage: `chronoq_predictor/chronoq_predictor/storage/sqlite.py` and `memory.py`
+- Exports: `chronoq_predictor/chronoq_predictor/__init__.py` — update `__all__` when adding public types
+
+### Modifying the server
+- App entrypoint: `chronoq_server/chronoq_server/main.py` (FastAPI lifespan, router mounting)
+- Config: `chronoq_server/chronoq_server/config.py` (ServerConfig, env var mapping)
+- Queue: `chronoq_server/chronoq_server/core/queue.py` (Redis sorted set operations)
+- Scheduler: `chronoq_server/chronoq_server/core/scheduler.py` (bridges predictor ↔ queue)
+- Workers: `chronoq_server/chronoq_server/core/worker.py` (async worker pool)
+- API routes: `chronoq_server/chronoq_server/api/tasks.py` and `api/metrics.py`
+- Task simulation: `chronoq_server/chronoq_server/task_registry.py`
+
+### Adding tests
+- Shared fixtures: `tests/conftest.py` (memory_store, predictor_config with low thresholds)
+- Server tests use fakeredis — see any `tests/server/test_*.py` for the pattern
+- Server integration tests mock `simulate_task` for speed — see `tests/server/test_integration.py`
+
+### Documentation updates
+- README.md — landing page (badges, Mermaid diagrams, demo output)
+- docs/architecture.md — system design, data flow, thread safety
+- docs/user-guide.md — setup, standalone usage, integration patterns
+- docs/api-reference.md — REST API with request/response examples
+- docs/configuration.md — env vars, PredictorConfig, Redis key layout
+- docs/postman/ — Postman collection + environment (update when API changes)
+- Use `/sync-docs` to check all docs for staleness after code changes.
+
+### Database migrations
+- Alembic config: `alembic.ini` + `migrations/env.py`
+- Versions: `migrations/versions/` — numbered migration files
+- SqliteStore auto-creates the table via `CREATE TABLE IF NOT EXISTS`, so Alembic is only needed for schema evolution on existing databases.
+
+## Subagent Patterns
+
+Use the Agent tool for tasks that benefit from parallel exploration or deep codebase search without polluting the main conversation context.
+
+### Recommended subagent uses
+
+**Codebase exploration** (subagent_type=Explore):
+- "Find all places where PredictionTracker is instantiated or used"
+- "Trace the data flow from POST /tasks through to worker completion"
+- "Find all Pydantic models and their field definitions across both packages"
+
+**Parallel research** (subagent_type=Explore, multiple calls):
+- When investigating a bug: spawn one agent to trace the predictor path and another to trace the server path
+- When adding a feature that touches both packages: one agent reads predictor code, another reads server code
+
+**Parallel validation** (multiple Agent calls):
+- Run boundary check + lint + tests concurrently via separate agents
+- Check docs/API consistency + run test coverage concurrently
+
+### When NOT to use subagents
+- Simple single-file edits — just read and edit directly
+- Running a single command — use Bash directly
+- Reading 1-2 known files — use Read directly
+
+## Workflow: Common Scenarios
+
+### Adding a new API endpoint
+1. Add route in `chronoq_server/chronoq_server/api/tasks.py` or `api/metrics.py`
+2. Add Pydantic request/response models in the same file (or schemas.py if shared)
+3. Wire up in `main.py` if adding a new router
+4. Add test in `tests/server/test_api_*.py`
+5. Run `/validate`
+6. Run `/sync-docs` to update api-reference.md and Postman collection
+
+### Adding a new storage backend
+1. Create `chronoq_predictor/chronoq_predictor/storage/newbackend.py` implementing `TelemetryStore`
+2. Add URI dispatch in `storage/__init__.py` `create_store()`
+3. Add tests in `tests/predictor/test_newbackend_storage.py`
+4. Run `/boundary-check` to verify no server imports leaked in
+5. Update docs/configuration.md with the new URI pattern
+
+### Adding a new model type
+1. Create `chronoq_predictor/chronoq_predictor/models/newmodel.py` extending `BaseEstimator`
+2. Update promotion logic in `predictor.py` `retrain()` method
+3. Add `model_type` string to `PredictionResult.model_type` Literal in schemas.py
+4. Add tests in `tests/predictor/test_newmodel.py`
+5. Run `/validate`
+
+### Fixing a bug
+1. Write a failing test that reproduces the bug
+2. Fix the code
+3. Run `/test` for the relevant scope
+4. Run `/validate` for full suite
+5. Run `/boundary-check` if changes touched predictor imports
+
+### Updating after code changes
+1. Run `/validate` — catches lint, format, and test failures
+2. Run `/sync-docs` — catches stale documentation
+3. Run `/boundary-check` — catches accidental import leaks
+
+## Architecture Quick Reference
+
+```
+Client → POST /tasks → Scheduler.score_and_enqueue()
+                          ├─ predictor.predict() → estimated_ms
+                          └─ queue.enqueue(score=estimated_ms) → Redis ZADD
+                                                                    ↓
+Worker ← queue.dequeue() ← Redis ZPOPMIN (lowest score = shortest job)
+   ↓
+   execute task → measure actual_ms
+   ↓
+   scheduler.report_completion() → predictor.record()
+                                      ↓
+                                   auto-retrain if count_since >= retrain_every_n
+                                   auto-promote heuristic → gradient after cold_start_threshold
+```
