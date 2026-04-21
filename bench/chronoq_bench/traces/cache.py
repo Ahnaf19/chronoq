@@ -11,7 +11,7 @@ _BENCH_ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = _BENCH_ROOT / "data"
 ARTIFACTS_DIR = _BENCH_ROOT / "artifacts"
 
-CI_SAMPLE_PATH = DATA_DIR / "burstgpt_ci_sample.parquet"
+CI_SAMPLE_PATH = _BENCH_ROOT / "fixtures" / "burstgpt_ci_sample.parquet"
 BURSTGPT_CACHE_PATH = DATA_DIR / "burstgpt_full.parquet"
 
 

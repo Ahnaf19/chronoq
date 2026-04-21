@@ -42,7 +42,7 @@ LLM inference request trace with ~500:1 short:long duration ratio. Download:
 # huggingface_hub snapshot_download("lzzmm/BurstGPT") — 188MB cached to bench/data/
 CHRONOQ_BENCH_OFFLINE=0 make bench
 ```
-CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row sample committed at `bench/data/burstgpt_ci_sample.parquet`).
+CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row sample committed at `bench/fixtures/burstgpt_ci_sample.parquet`).
 
 ## Schedulers
 
