@@ -20,7 +20,7 @@ last-synced-to-plan: 2026-04-21
 
 | Chunk | Status | What shipped | Exit criteria |
 |---|---|---|---|
-| **0 — Scaffold + team + docs** | ⏳ W3 in progress | W1: renames + workspace stubs. W2: 5 subagents + 4 slash commands + hooks. W3: docs restructure. | 73 tests green, `/boundary-check` clean, `docs/v2/` present |
+| **0 — Scaffold + team + docs** | ✅ complete | W1: renames + workspace stubs. W2: 5 subagents + 4 slash commands + hooks. W3: docs restructure. | 73 tests green, `/boundary-check` clean, `docs/v2/` present |
 | 1 — `chronoq-ranker` | pending | — | Spearman ρ ≥ 0.80, pairwise acc ≥ 0.78 on 50k synthetic |
 | 2 — `chronoq-bench` | pending | — | ≥10% mean / ≥15% p99 JCT vs FCFS on BurstGPT |
 | 3 — `chronoq-celery` | pending | — | ≥15% mean JCT improvement on 200-task demo |
