@@ -4,6 +4,40 @@ All notable changes to Chronoq. Format loosely based on [Keep a Changelog](https
 
 ## [Unreleased] — v2 in progress
 
+### Chunk 1 — `chronoq-ranker` LambdaRank library (2026-04-21)
+
+Branch `v2/chunk-1-ranker` → PR #2, merged to main.
+
+**Weekend 1 — `.claude/` additions:**
+- `ml-engineer` subagent added to `.claude/agents/`
+- `/architecture-check` and `/ml-review` slash commands
+- `ranker/CLAUDE.md` updated with LambdaRank specifics and ownership map
+
+**Weekend 2 — Rename + schema extension + feature engineering:**
+- `TaskPredictor` → `TaskRanker`; `PredictorConfig` → `RankerConfig`; `tests/predictor/` → `tests/ranker/`; deprecation shims preserve v1 imports with `DeprecationWarning`
+- `TaskRecord` extended: `group_id`, `rank_label`, `feature_schema_version`; `SqliteStore` auto-migrates
+- `RankerConfig` extended: `incremental_rounds`, `min_groups`, `full_refit_every_n_incrementals`, `psi_threshold`, `allow_degrade`
+- `FeatureSchema` + `FeatureExtractor` ABC + `DefaultExtractor` (15 features) + `DEFAULT_SCHEMA_V1`
+- `TaskRanker.predict_scores(candidates)` batch-ranking API; `ScoredTask`, `TaskCandidate`, `QueueContext` schemas
+
+**Weekend 3 — LambdaRank, Oracle, Drift + 52 new tests:**
+- `LambdaRankEstimator` (`lightgbm.LGBMRanker`, `objective="lambdarank"`): 60s tumbling group assignment, proportional label normalization (0–9), incremental warm-start via `init_model`, Spearman ρ rejection gate, per-group metrics (ρ, τ, pairwise accuracy)
+- `OracleRanker` — perfect SJF/SRPT using true `actual_ms`; benchmarks upper bound
+- `DriftDetector` — PSI per numeric feature (warn >0.2, drift >0.3) + rolling MAE tracking
+- `TaskRanker.retrain()` wired: auto-promotes heuristic → lambdarank; degrades to `GradientEstimator` on `InsufficientGroupsError` when `allow_degrade=True`
+- `lightgbm>=4.3` + `numpy>=1.26` added to ranker runtime deps; `hypothesis>=6.100` to root dev deps
+- 52 new tests: `test_lambdarank.py` (25), `test_oracle.py` (8), `test_drift.py` (11), `test_lambdarank_hypothesis.py` (8 property tests)
+
+**Exit criteria (all verified pre-merge):**
+
+| Metric | Result | Target |
+|---|---|---|
+| Spearman ρ on 50k synthetic | 0.8692 | ≥ 0.80 |
+| Pairwise accuracy | 0.8857 | ≥ 0.78 |
+| Incremental retrain (10k records) | 109.7ms | < 200ms |
+| Tests | 137 passing | ≥ 40 ranker |
+| Lint | 0 errors | clean |
+
 ### Chunk 0 — Scaffold + `.claude/` team + docs restructure (2026-04-21)
 
 Branch `v2/scaffold`. v1 → v2 repositioning from "ML-scheduled job queue" to a library-first structure: reusable ranker + benchmark harness + integration demos.
