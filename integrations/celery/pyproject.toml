@@ -5,6 +5,9 @@ description = "Celery integration for chronoq-ranker — LearnedScheduler with s
 requires-python = ">=3.11"
 dependencies = [
     "chronoq-ranker",
+    "celery>=5.4",
+    "redis>=5.0",
+    "loguru>=0.7",
 ]
 
 [build-system]
