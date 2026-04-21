@@ -3,8 +3,17 @@
 from typing import TYPE_CHECKING
 
 from chronoq_ranker.config import RankerConfig
+from chronoq_ranker.features import DEFAULT_SCHEMA_V1, DefaultExtractor, FeatureExtractor
 from chronoq_ranker.ranker import TaskRanker
-from chronoq_ranker.schemas import PredictionResult, RetrainResult, TaskRecord
+from chronoq_ranker.schemas import (
+    FeatureSchema,
+    PredictionResult,
+    QueueContext,
+    RetrainResult,
+    ScoredTask,
+    TaskCandidate,
+    TaskRecord,
+)
 
 __all__ = [
     "TaskRanker",
@@ -12,6 +21,13 @@ __all__ = [
     "PredictionResult",
     "RetrainResult",
     "TaskRecord",
+    "TaskCandidate",
+    "ScoredTask",
+    "QueueContext",
+    "FeatureSchema",
+    "FeatureExtractor",
+    "DefaultExtractor",
+    "DEFAULT_SCHEMA_V1",
     # Deprecated v1 aliases (remove in next major version):
     "TaskPredictor",
     "PredictorConfig",

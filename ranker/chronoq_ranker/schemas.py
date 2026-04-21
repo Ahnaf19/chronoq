@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+ModelTypeLiteral = Literal["heuristic", "gradient_boosting", "lambdarank"]
+
 
 class TaskRecord(BaseModel):
     """A recorded task execution with timing telemetry.
@@ -42,7 +44,7 @@ class PredictionResult(BaseModel):
     estimated_ms: float
     confidence: float = Field(ge=0.0, le=1.0)
     model_version: str
-    model_type: Literal["heuristic", "gradient_boosting", "lambdarank"]
+    model_type: ModelTypeLiteral
 
 
 class RetrainResult(BaseModel):
@@ -100,3 +102,19 @@ class QueueContext(BaseModel):
     recent_p95_ms_this_type: float = 0.0
     recent_count_this_type: int = 0
     time_since_last_retrain_s: float = 0.0
+
+
+class ScoredTask(BaseModel):
+    """A single candidate's score + rank from ``TaskRanker.predict_scores``.
+
+    ``score`` is the raw estimator output (currently estimated duration in ms;
+    in Chunk 1 W3 lambdarank lands and this becomes a relative pairwise score).
+    **Lower score = scheduled sooner.** ``rank`` is 0-indexed within the
+    returned batch after sorting.
+    """
+
+    task_id: str
+    score: float
+    rank: int
+    model_version: str
+    model_type: ModelTypeLiteral
