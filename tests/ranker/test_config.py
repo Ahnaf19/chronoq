@@ -1,10 +1,10 @@
-"""Tests for PredictorConfig."""
+"""Tests for RankerConfig."""
 
-from chronoq_ranker.config import PredictorConfig
+from chronoq_ranker.config import RankerConfig
 
 
 def test_defaults():
-    cfg = PredictorConfig()
+    cfg = RankerConfig()
     assert cfg.cold_start_threshold == 50
     assert cfg.retrain_every_n == 100
     assert cfg.drift_threshold_mae_ms == 500.0
@@ -13,14 +13,14 @@ def test_defaults():
 
 
 def test_overrides():
-    cfg = PredictorConfig(cold_start_threshold=20, retrain_every_n=50)
+    cfg = RankerConfig(cold_start_threshold=20, retrain_every_n=50)
     assert cfg.cold_start_threshold == 20
     assert cfg.retrain_every_n == 50
 
 
 def test_mutable_default_safety():
     """Ensure feature_columns default is not shared between instances."""
-    a = PredictorConfig()
-    b = PredictorConfig()
+    a = RankerConfig()
+    b = RankerConfig()
     a.feature_columns.append("extra")
     assert "extra" not in b.feature_columns

@@ -1,13 +1,68 @@
-"""Chronoq Predictor — ML-based task execution time prediction."""
+"""Chronoq ranker — learning-to-rank scheduling library for Python job queues."""
 
-from chronoq_ranker.config import PredictorConfig
-from chronoq_ranker.predictor import TaskPredictor
-from chronoq_ranker.schemas import PredictionResult, RetrainResult, TaskRecord
+from typing import TYPE_CHECKING
+
+from chronoq_ranker.config import RankerConfig
+from chronoq_ranker.drift import DriftDetector
+from chronoq_ranker.features import DEFAULT_SCHEMA_V1, DefaultExtractor, FeatureExtractor
+from chronoq_ranker.models.lambdarank import LambdaRankEstimator
+from chronoq_ranker.models.oracle import OracleRanker
+from chronoq_ranker.ranker import TaskRanker
+from chronoq_ranker.schemas import (
+    DriftReport,
+    FeatureSchema,
+    InsufficientGroupsError,
+    PredictionResult,
+    QueueContext,
+    RetrainResult,
+    ScoredTask,
+    TaskCandidate,
+    TaskRecord,
+)
 
 __all__ = [
-    "TaskPredictor",
-    "PredictorConfig",
+    "TaskRanker",
+    "RankerConfig",
     "PredictionResult",
     "RetrainResult",
     "TaskRecord",
+    "TaskCandidate",
+    "ScoredTask",
+    "QueueContext",
+    "FeatureSchema",
+    "FeatureExtractor",
+    "DefaultExtractor",
+    "DEFAULT_SCHEMA_V1",
+    "DriftDetector",
+    "DriftReport",
+    "LambdaRankEstimator",
+    "OracleRanker",
+    "InsufficientGroupsError",
+    # Deprecated v1 aliases (remove in next major version):
+    "TaskPredictor",
+    "PredictorConfig",
 ]
+
+if TYPE_CHECKING:
+    # Names surfaced via ``__getattr__`` below; re-declare for static checkers.
+    TaskPredictor = TaskRanker
+    PredictorConfig = RankerConfig
+
+
+def __getattr__(name: str):
+    """Deprecation shim for v1 top-level names."""
+    import warnings
+
+    aliases = {
+        "TaskPredictor": ("TaskRanker", TaskRanker),
+        "PredictorConfig": ("RankerConfig", RankerConfig),
+    }
+    if name in aliases:
+        new_name, target = aliases[name]
+        warnings.warn(
+            f"chronoq_ranker.{name} is deprecated; use chronoq_ranker.{new_name}.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return target
+    raise AttributeError(f"module 'chronoq_ranker' has no attribute {name!r}")

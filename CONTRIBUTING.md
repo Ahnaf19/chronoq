@@ -19,12 +19,14 @@ uv run ruff check .
 
 ## Project Structure
 
-This is a uv workspace monorepo with two packages:
+This is a uv workspace monorepo with four packages:
 
-- `predictor/` — standalone ML library (no Redis/FastAPI dependency)
-- `server/` — task queue server (depends on chronoq-predictor)
+- `ranker/` — standalone learning-to-rank scheduling library (no Redis/FastAPI dependency)
+- `bench/` — benchmark harness (SimPy simulator + traces + baselines; Chunk 2+)
+- `integrations/celery/` — Celery plugin (Chunk 3+)
+- `demo-server/` — reference FastAPI+Redis integration (v1 demoted)
 
-Tests live in `tests/predictor/` and `tests/server/` respectively.
+Tests live under `tests/{ranker,server,bench,celery}/` mirroring the packages.
 
 ## Code Standards
 
@@ -45,8 +47,8 @@ uv run ruff format .
 # Full suite
 uv run pytest -v
 
-# Predictor tests only
-uv run pytest tests/predictor/ -v
+# Ranker tests only
+uv run pytest tests/ranker/ -v
 
 # Server tests only (uses fakeredis, no real Redis needed)
 uv run pytest tests/server/ -v
@@ -77,8 +79,10 @@ Use conventional-style prefixes:
 
 ### Important Boundaries
 
-- `chronoq-predictor` must **never** import from `chronoq-server`. It is a standalone library with zero coupling to Redis, FastAPI, or any queue system.
+- `chronoq-ranker` must **never** import from `chronoq-demo-server`, Redis, FastAPI, Celery, or vLLM. It is a standalone library. Verify with `/boundary-check`.
 - Server tests should use `fakeredis` — do not require a running Redis instance for unit tests.
+- Any edit to `ranker/chronoq_ranker/{ranker,schemas,config,features,__init__}.py` or `models/base.py` / `storage/base.py` → run `/architecture-check` first (library-architect).
+- Any edit under `ranker/chronoq_ranker/{models,features,drift}.py` → run `/ml-review` (ml-engineer).
 
 ## Reporting Issues
 

@@ -2,7 +2,7 @@
 
 Learning-to-rank scheduling library for Python job queues. Replaces FIFO/static-priority ordering with online-learning LambdaRank trained on job-duration telemetry.
 
-**Phase:** Chunk 0 (scaffold + `.claude/` team + docs restructure). Branch `v2/scaffold`. Full plan: `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md`. v2 docs (when Weekend 3 ships): `docs/v2/`.
+**Phase:** Chunk 1 W2 shipped (ranker rename + schema extension + FeatureSchema/FeatureExtractor + predict_scores). W3 next: LambdaRankEstimator, OracleRanker, drift detector, ~40-test expansion to hit Spearman ρ ≥ 0.80 on 50k synthetic. Full plan: `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md`. v2 docs: `docs/v2/`.
 
 ## Monorepo Layout
 
@@ -121,13 +121,14 @@ Full roster + invocation triggers + ownership: plan `/Users/ahnaftanjid/.claude/
 
 ## Key Files
 
-- Ranker public API: `ranker/chronoq_ranker/predictor.py` (renamed to `ranker.py` in Chunk 1)
-- Schemas: `ranker/chronoq_ranker/schemas.py`
-- Config: `ranker/chronoq_ranker/config.py`
-- Models: `ranker/chronoq_ranker/models/{heuristic,gradient}.py` (adds `lambdarank.py`, `oracle.py` in Chunk 1)
-- Storage: `ranker/chronoq_ranker/storage/{sqlite,memory}.py`
-- Shared test fixtures: `tests/conftest.py`
-- Per-package CLAUDE.md exists under `ranker/`, `demo-server/`, `tests/` (and later `bench/`, `integrations/celery/`, `docs/`).
+- Ranker public API: `ranker/chronoq_ranker/ranker.py` (`TaskRanker`). `predictor.py` is a 22-line deprecated shim re-exporting `TaskRanker as TaskPredictor`.
+- Schemas: `ranker/chronoq_ranker/schemas.py` (`TaskRecord`, `TaskCandidate`, `ScoredTask`, `FeatureSchema`, `QueueContext`, `PredictionResult`, `RetrainResult`).
+- Config: `ranker/chronoq_ranker/config.py` (`RankerConfig`; `PredictorConfig` is a silent alias).
+- Features: `ranker/chronoq_ranker/features.py` (`FeatureExtractor` ABC, `DefaultExtractor`, `DEFAULT_SCHEMA_V1`).
+- Models: `ranker/chronoq_ranker/models/{heuristic,gradient}.py` today; adds `lambdarank.py`, `oracle.py` in Chunk 1 W3.
+- Storage: `ranker/chronoq_ranker/storage/{sqlite,memory}.py`.
+- Shared test fixtures: `tests/conftest.py`.
+- Per-package CLAUDE.md exists under `ranker/`, `demo-server/`, `tests/`, `docs/` (and later `bench/`, `integrations/celery/`).
 
 ## Subagents
 

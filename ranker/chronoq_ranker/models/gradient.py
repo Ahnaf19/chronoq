@@ -6,8 +6,8 @@ import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.preprocessing import LabelEncoder
 
-from chronoq_ranker.features import extract_training_features
-from chronoq_ranker.models.base import BaseEstimator
+from chronoq_ranker.features import _legacy_extract_training_features
+from chronoq_ranker.models.base import BaseEstimator, ModelType
 from chronoq_ranker.models.heuristic import HeuristicEstimator
 from chronoq_ranker.schemas import TaskRecord
 
@@ -34,7 +34,7 @@ class GradientEstimator(BaseEstimator):
         task_types = []
 
         for r in records:
-            feat = extract_training_features(r)
+            feat = _legacy_extract_training_features(r)
             task_types.append(feat["task_type"])
             features_list.append(feat)
             targets.append(r.actual_ms)
@@ -97,7 +97,7 @@ class GradientEstimator(BaseEstimator):
     def version(self) -> str:
         return self._version
 
-    def model_type(self) -> str:
+    def model_type(self) -> ModelType:
         return "gradient_boosting"
 
     def _build_feature_matrix(self, features_list: list[dict]) -> np.ndarray:
