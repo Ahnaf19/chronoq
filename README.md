@@ -7,7 +7,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Status](https://img.shields.io/badge/status-v2%20in%20progress-yellow?style=flat-square)
 
-> **v2 in progress (Chunks 0–2 complete).** `chronoq-ranker` (LightGBM LambdaRank) and `chronoq-bench` (SimPy simulator, 5 baselines) are built and tested. Celery integration lands in Chunk 3. See [`docs/v2/`](docs/v2/) for design and benchmark results, [`docs/v1/`](docs/v1/) for the prior FastAPI+Redis architecture (still runs in `demo-server/`).
+> **v2 in progress (Chunks 0–3 complete).** `chronoq-ranker` (LightGBM LambdaRank), `chronoq-bench` (SimPy simulator, 5 baselines), and `chronoq-celery` (Celery plugin, +55% mean JCT vs FIFO) are built and tested. See [`docs/v2/`](docs/v2/) for design, benchmark results, and integration guide.
 
 ---
 
@@ -39,7 +39,7 @@ chronoq/
 | 0 — Scaffold + team + docs | ✅ complete | workspace, `.claude/` team, docs restructure — 73 tests |
 | 1 — `chronoq-ranker` | ✅ complete | LightGBM LambdaRank — Spearman ρ=0.87, pairwise acc=0.89 |
 | 2 — `chronoq-bench` | ✅ complete | `make bench` — **+32% mean JCT, +17.5% p99 vs FCFS** @ load=0.7 |
-| 3 — `chronoq-celery` | pending | Drop-in Celery plugin, 15%+ JCT improvement demo |
+| 3 — `chronoq-celery` | ✅ complete | `LearnedScheduler` (shadow/active/fifo), +55% mean JCT vs FIFO — 216 tests |
 | 4 — Polish + promo | pending | PyPI releases, blog post, Show HN |
 
 Full milestone detail: [`docs/v2/README.md`](docs/v2/README.md).
@@ -52,7 +52,7 @@ Full milestone detail: [`docs/v2/README.md`](docs/v2/README.md).
 git clone https://github.com/Ahnaf19/chronoq.git
 cd chronoq
 uv sync
-uv run pytest -v                # 185 tests
+uv run pytest -v                # 216 tests
 ```
 
 **Run the benchmark** (Chunk 2 — produces the money plot):
@@ -80,6 +80,28 @@ scored = ranker.predict_scores([
 # scored[0] is the job LambdaRank predicts finishes fastest
 ```
 
+**Use the Celery integration** (Chunk 3 — +55% mean JCT improvement):
+
+```python
+from chronoq_celery import LearnedScheduler, attach_signals
+from celery import Celery
+
+app = Celery("myapp", broker="redis://localhost:6379/0")
+scheduler = LearnedScheduler(mode="active")  # or "shadow" (log-only) or "fifo"
+attach_signals(app, scheduler)
+
+# Submit tasks through the scheduler instead of apply_async directly
+scheduler.submit("resize", 1024, lambda: my_task.apply_async(...))
+```
+
+Run the demo:
+
+```bash
+make celery-demo     # prints fifo vs active JCT table — no Docker required
+```
+
+Full quickstart: [`docs/v2/INTEGRATIONS.md`](docs/v2/INTEGRATIONS.md).
+
 **v1 reference server** (demo-server, still works):
 
 ```bash
@@ -95,6 +117,7 @@ curl -X POST http://localhost:8000/tasks -H 'content-type: application/json' \
 | Audience | Start here |
 |---|---|
 | **Trying Chronoq** | [`docs/v2/README.md`](docs/v2/README.md) — landing + chunk status |
+| **Celery quickstart** | [`docs/v2/INTEGRATIONS.md`](docs/v2/INTEGRATIONS.md) — install, modes, seeding, training |
 | **Contributing** | [`docs/v2/architecture.md`](docs/v2/architecture.md) — system design |
 | **Stack details** | [`docs/v2/tech-stack.md`](docs/v2/tech-stack.md) — dependencies, versions, rationale |
 | **Historical (v1)** | [`docs/v1/`](docs/v1/) — FastAPI+Redis architecture (still in `demo-server/`) |

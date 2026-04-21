@@ -1,6 +1,6 @@
 # tests
 
-185 tests: 113 ranker (`tests/ranker/`) + 24 demo-server (`tests/server/`) + 43 bench (`tests/bench/`) + 1 bench stub + 1 celery stub (2 stubs remain for Chunk 3+). No external services required.
+216 tests: 111 ranker (`tests/ranker/`) + 24 demo-server (`tests/server/`) + 49 bench (`tests/bench/`) + 32 celery (`tests/celery/`). No external services required.
 
 ## Layout
 
@@ -9,8 +9,8 @@ tests/
 ├── conftest.py              # Shared fixtures: memory_store, predictor_config (low thresholds)
 ├── ranker/                  # 113 — schemas, config, storage, features, heuristic, gradient, orchestrator, integration, compat shims, predict_scores, lambdarank, oracle, drift, hypothesis
 ├── server/                  # 24 — queue, scheduler, worker, api/*, integration
-├── bench/                   # 43 — test_metrics (15), test_traces (9), test_simulator (12), test_baselines (5), test_stub (1) + Chunk 2
-└── celery/                  # 1 stub (populates in Chunk 3)
+├── bench/                   # 49 — test_metrics (17), test_traces (14), test_simulator (12), test_baselines (5), test_stub (1)
+└── celery/                  # 32 — test_rolling (9), test_scheduler (19), test_signals (4), test_stub (1)
 ```
 
 ## Conventions
@@ -24,10 +24,11 @@ tests/
 ## Run
 
 ```bash
-uv run pytest -v                           # All 185
+uv run pytest -v                           # All 216
 uv run pytest tests/ranker/ -v             # Ranker only (113)
 uv run pytest tests/server/ -v             # Demo-server only (24)
-uv run pytest tests/bench/ -v             # Bench only (43)
+uv run pytest tests/bench/ -v             # Bench only (49)
+uv run pytest tests/celery/ -v             # Celery only (32)
 uv run pytest -k "lambdarank" -v           # LambdaRank tests only
 uv run pytest -k "hypothesis" -v          # Property tests only
 uv run pytest --cov=chronoq_ranker --cov=chronoq_demo_server

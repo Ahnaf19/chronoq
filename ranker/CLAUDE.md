@@ -75,7 +75,7 @@ Headline: **Spearman ρ**, **Kendall τ**, **pairwise accuracy** on held-out gro
 ## Testing
 
 ```bash
-uv run pytest tests/ranker/ -v              # 113 tests (47 original + 4 compat + 8 predict_scores + 25 lambdarank + 8 oracle + 11 drift + 8 hypothesis + 2 features)
+uv run pytest tests/ranker/ -v              # 111 tests (47 original + 4 compat + 8 predict_scores + 23 lambdarank + 8 oracle + 11 drift + 8 hypothesis + 2 features)
 ```
 
 Uses `memory://` storage and low thresholds (`cold_start_threshold=10`, `retrain_every_n=20`) via `conftest.py`. Hypothesis property tests in `test_lambdarank_hypothesis.py`: rank-label monotonicity, ρ range [-1,1], pairwise accuracy range [0,1], PSI non-negative.
