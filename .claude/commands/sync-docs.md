@@ -2,9 +2,9 @@ Synchronize documentation with the current codebase.
 
 Check for staleness in these areas:
 
-1. **API endpoints** — Read `server/chronoq_server/api/tasks.py` and `api/metrics.py`. Compare the actual routes, request/response models, and query params against `docs/api-reference.md` and `README.md` API table. Flag any mismatches.
+1. **API endpoints** — Read `server/chronoq_demo_server/api/tasks.py` and `api/metrics.py`. Compare the actual routes, request/response models, and query params against `docs/api-reference.md` and `README.md` API table. Flag any mismatches.
 
-2. **Configuration** — Read `server/chronoq_server/config.py` and `predictor/chronoq_predictor/config.py`. Compare actual env vars and config fields against `docs/configuration.md` and `.env.example`. Flag any mismatches.
+2. **Configuration** — Read `server/chronoq_demo_server/config.py` and `predictor/chronoq_ranker/config.py`. Compare actual env vars and config fields against `docs/configuration.md` and `.env.example`. Flag any mismatches.
 
 3. **Postman collection** — Read `docs/postman/chronoq.postman_collection.json`. Compare endpoints against actual API routes. Flag missing or outdated endpoints.
 

@@ -4,8 +4,10 @@ requires-python = ">=3.11"
 
 [manifest]
 members = [
-    "chronoq-predictor",
-    "chronoq-server",
+    "chronoq-bench",
+    "chronoq-celery",
+    "chronoq-demo-server",
+    "chronoq-ranker",
 ]
 
 [manifest.dependency-groups]
@@ -68,9 +70,52 @@ wheels = [
 ]
 
 [[package]]
-name = "chronoq-predictor"
+name = "chronoq-bench"
 version = "0.1.0"
-source = { editable = "predictor" }
+source = { editable = "bench" }
+dependencies = [
+    { name = "chronoq-ranker" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "chronoq-ranker", editable = "ranker" }]
+
+[[package]]
+name = "chronoq-celery"
+version = "0.1.0"
+source = { editable = "integrations/celery" }
+dependencies = [
+    { name = "chronoq-ranker" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "chronoq-ranker", editable = "ranker" }]
+
+[[package]]
+name = "chronoq-demo-server"
+version = "0.1.0"
+source = { editable = "demo-server" }
+dependencies = [
+    { name = "chronoq-ranker" },
+    { name = "fastapi" },
+    { name = "loguru" },
+    { name = "redis" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "chronoq-ranker", editable = "ranker" },
+    { name = "fastapi", specifier = ">=0.110" },
+    { name = "loguru", specifier = ">=0.7" },
+    { name = "redis", specifier = ">=5.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
+]
+
+[[package]]
+name = "chronoq-ranker"
+version = "0.1.0"
+source = { editable = "ranker" }
 dependencies = [
     { name = "loguru" },
     { name = "pydantic" },
@@ -82,27 +127,6 @@ requires-dist = [
     { name = "loguru", specifier = ">=0.7" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "scikit-learn", specifier = ">=1.4" },
-]
-
-[[package]]
-name = "chronoq-server"
-version = "0.1.0"
-source = { editable = "server" }
-dependencies = [
-    { name = "chronoq-predictor" },
-    { name = "fastapi" },
-    { name = "loguru" },
-    { name = "redis" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "chronoq-predictor", editable = "predictor" },
-    { name = "fastapi", specifier = ">=0.110" },
-    { name = "loguru", specifier = ">=0.7" },
-    { name = "redis", specifier = ">=5.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
 ]
 
 [[package]]

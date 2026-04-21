@@ -1,8 +1,8 @@
 Verify the critical package boundary: chronoq-predictor must never import from chronoq-server.
 
 Run these checks:
-1. `grep -r "chronoq_server" predictor/` — must return nothing
-2. `grep -r "from chronoq_server" tests/predictor/` — must return nothing
+1. `grep -r "chronoq_demo_server" predictor/` — must return nothing
+2. `grep -r "from chronoq_demo_server" tests/predictor/` — must return nothing
 3. `grep -r "import redis" predictor/` — must return nothing
 4. `grep -r "import fastapi" predictor/` — must return nothing
 

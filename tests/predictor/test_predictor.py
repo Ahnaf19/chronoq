@@ -3,9 +3,9 @@
 import random
 import threading
 
-from chronoq_predictor.config import PredictorConfig
-from chronoq_predictor.predictor import TaskPredictor
-from chronoq_predictor.storage.memory import MemoryStore
+from chronoq_ranker.config import PredictorConfig
+from chronoq_ranker.predictor import TaskPredictor
+from chronoq_ranker.storage.memory import MemoryStore
 
 
 def _make_predictor(

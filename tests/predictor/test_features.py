@@ -1,7 +1,7 @@
 """Tests for feature extraction."""
 
-from chronoq_predictor.features import extract_features, extract_training_features
-from chronoq_predictor.schemas import TaskRecord
+from chronoq_ranker.features import extract_features, extract_training_features
+from chronoq_ranker.schemas import TaskRecord
 
 
 def test_extract_features_keys():

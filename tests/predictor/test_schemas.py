@@ -3,7 +3,7 @@
 from datetime import UTC
 
 import pytest
-from chronoq_predictor.schemas import PredictionResult, RetrainResult, TaskRecord
+from chronoq_ranker.schemas import PredictionResult, RetrainResult, TaskRecord
 from pydantic import ValidationError
 
 

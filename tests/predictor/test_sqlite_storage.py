@@ -1,7 +1,7 @@
 """Tests for SqliteStore."""
 
-from chronoq_predictor.schemas import TaskRecord
-from chronoq_predictor.storage.sqlite import SqliteStore
+from chronoq_ranker.schemas import TaskRecord
+from chronoq_ranker.storage.sqlite import SqliteStore
 
 
 def test_save_and_get_all(tmp_path):

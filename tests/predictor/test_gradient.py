@@ -2,8 +2,8 @@
 
 import random
 
-from chronoq_predictor.models.gradient import GradientEstimator
-from chronoq_predictor.schemas import TaskRecord
+from chronoq_ranker.models.gradient import GradientEstimator
+from chronoq_ranker.schemas import TaskRecord
 
 
 def _synthetic_records(n: int = 60) -> list[TaskRecord]:
