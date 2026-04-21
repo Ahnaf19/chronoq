@@ -88,3 +88,16 @@ class TestRetrainResult:
             mae=0.0, mape=0.0, samples_used=10, model_version="v1", promoted=False, rejected=True
         )
         assert r.rejected is True
+
+
+def test_retrain_result_rejected_field():
+    """Plan exit-criteria gate: RetrainResult.rejected field exists and propagates correctly."""
+    r_default = RetrainResult(
+        mae=0.0, mape=0.0, samples_used=10, model_version="v1", promoted=False
+    )
+    assert r_default.rejected is False
+
+    r_rejected = RetrainResult(
+        mae=0.0, mape=0.0, samples_used=10, model_version="v1", promoted=False, rejected=True
+    )
+    assert r_rejected.rejected is True

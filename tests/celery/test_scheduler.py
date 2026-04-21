@@ -196,3 +196,43 @@ class TestRegistryIntegrity:
         scheduler.record_completion(task_id, "resize", 512)
         with scheduler._lock:
             assert task_id not in scheduler._registry
+
+
+class TestFeatureContext:
+    def test_feature_context_in_training_records(self):
+        """record_completion must pass queue context metadata to ranker.record().
+
+        Verifies that the TaskRecord saved to storage contains non-zero values for
+        the context keys expected by DefaultExtractor (recent_mean_ms_this_type,
+        queue_depth, etc.) — eliminating the train-serve feature skew where 10/15
+        features were always 0.0 at training time.
+        """
+        from chronoq_ranker import TaskRanker
+        from chronoq_ranker.config import RankerConfig
+        from chronoq_ranker.storage.memory import MemoryStore
+
+        store = MemoryStore()
+        ranker = TaskRanker(config=RankerConfig(storage_uri="memory://"), storage=store)
+
+        stats = TypeStatsTracker()
+        stats.seed({"resize": 200.0})  # seed so snapshot returns non-zero mean
+
+        scheduler = LearnedScheduler(mode="shadow", ranker=ranker, stats_tracker=stats)
+
+        task_id = scheduler.submit("resize", 1024, lambda: None)
+        scheduler.record_start(task_id, "resize", 1024)
+        scheduler.record_completion(task_id, "resize", 1024)
+
+        records = store.get_all()
+        assert len(records) == 1
+        metadata = records[0].metadata
+
+        # Context keys must be present and non-zero after seeding
+        assert "recent_mean_ms_this_type" in metadata
+        assert metadata["recent_mean_ms_this_type"] > 0.0, (
+            "recent_mean_ms_this_type should be > 0 after TypeStatsTracker.seed(); "
+            "if it's 0.0 the feature skew fix is not working."
+        )
+        assert "queue_depth" in metadata
+        assert "recent_p95_ms_this_type" in metadata
+        assert "recent_count_this_type" in metadata

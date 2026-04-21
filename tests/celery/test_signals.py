@@ -49,7 +49,7 @@ class TestSignalWiring:
         result = scheduler.record_completion("any-id", "resize", 512)
         assert result is None
 
-    def test_task_revoked_cleans_registry(self):
+    def test_task_revoked_calls_cleanup_registry(self):
         """task_revoked signal must remove the task from registry (prevents registry leak)."""
         scheduler = LearnedScheduler(mode="shadow")
         task_id = "test-uuid-revoked"
