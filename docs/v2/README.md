@@ -13,18 +13,18 @@ last-synced-to-plan: 2026-04-21
 |---|---|---|
 | [`architecture.md`](architecture.md) | current | System design, v1→v2 component map, key interfaces, algorithms |
 | [`tech-stack.md`](tech-stack.md) | current | Dependencies, versions, rationale, paid-tier upgrade path |
-| `BENCHMARKS.md` | Chunk 2 | Reproduction steps, trace sources, 5 baselines, metrics |
+| [`BENCHMARKS.md`](BENCHMARKS.md) | current | Reproduction steps, trace sources, 5 baselines, metrics, results |
 | `INTEGRATIONS.md` | Chunk 3 | Celery plugin quickstart, Hatchet sidecar design, vLLM deferred |
 
 ## Chunk status
 
-| Chunk | Status | What shipped | Exit criteria |
+| Chunk | Status | What shipped | Key numbers |
 |---|---|---|---|
-| **0 — Scaffold + team + docs** | ✅ complete | W1: renames + workspace stubs. W2: 5 subagents + 4 slash commands + hooks. W3: docs restructure. | 73 tests green, `/boundary-check` clean, `docs/v2/` present |
-| 1 — `chronoq-ranker` | pending | — | Spearman ρ ≥ 0.80, pairwise acc ≥ 0.78 on 50k synthetic |
-| 2 — `chronoq-bench` | pending | — | ≥10% mean / ≥15% p99 JCT vs FCFS on BurstGPT |
-| 3 — `chronoq-celery` | pending | — | ≥15% mean JCT improvement on 200-task demo |
-| 4 — Polish + promo | pending | — | README 90s-test, 1 blog post, PyPI releases |
+| **0 — Scaffold + team + docs** | ✅ complete | Renames, workspace stubs, 5 subagents, 4 slash commands, hooks, docs restructure | 73 tests, `/boundary-check` clean |
+| **1 — `chronoq-ranker`** | ✅ complete | LambdaRank estimator, OracleRanker, DriftDetector, 15-feature extractor, incremental warm-start | Spearman ρ=0.87, pairwise acc=0.89, retrain 110ms on 10k |
+| **2 — `chronoq-bench`** | ✅ complete | SimPy DES, 5 baselines, 3 experiments, `make bench`, bench-smoke CI | **+32% mean JCT, +17.5% p99 vs FCFS @ load=0.7** — 185 tests |
+| 3 — `chronoq-celery` | pending | — | ≥15% mean JCT improvement on 200-task Celery demo |
+| 4 — Polish + promo | pending | — | README hero plot, PyPI releases, blog post |
 
 ## Reading order for contributors
 
