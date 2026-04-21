@@ -76,3 +76,6 @@ Signal tests use mocks. All 32 tests pass with no external services.
 - `mode="fifo"` MUST short-circuit before any ranker call — tested with `test_fifo_ranker_never_instantiated`.
 - No new dependencies in `chronoq-ranker` — all framework deps belong here.
 - `attach_signals()` uses TYPE_CHECKING imports for `Celery` and `LearnedScheduler` — do not move to runtime imports.
+- **task_id uniqueness contract**: `submit()` raises `ValueError("task_id already registered: ...")` on duplicate task_id. Callers must pass unique task_ids per scheduler instance lifetime.
+- **task_revoked wired**: `attach_signals()` wires `task_revoked` → `cleanup_registry(task_id)`. Without this, cancelled tasks leak registry entries forever.
+- **record_completion passes queue context**: passes `metadata={"recent_mean_ms_this_type": ..., "queue_depth": ..., ...}` to `ranker.record()` via `TypeStatsTracker.snapshot()`. This eliminates train-serve feature skew (10/15 features were 0.0 before this fix).

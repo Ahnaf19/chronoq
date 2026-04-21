@@ -35,7 +35,7 @@ chronoq_ranker/
 
 ## Chunk 1 — LambdaRank specifics
 
-**Objective.** `LGBMRanker(objective="lambdarank", learning_rate=0.05, n_estimators=500, num_leaves=31, min_data_in_leaf=20)` — CPU-only, pairwise with NDCG gain.
+**Objective.** `LGBMRanker(objective="lambdarank")` with hyperparams from `RankerConfig`: `learning_rate=0.05`, `n_estimators=500`, `num_leaves=31`, `min_data_in_leaf=20` (all configurable). CPU-only, pairwise with NDCG gain.
 
 **Pairwise label construction** (central algorithm):
 - Group records by `group_id`. Default: 60s tumbling window of completion timestamps. Celery can pass a real `batch_id`.
@@ -66,11 +66,12 @@ Headline: **Spearman ρ**, **Kendall τ**, **pairwise accuracy** on held-out gro
 
 `threading.Lock` in `ranker.py` protects ONLY the `_estimator` pointer. Fit happens outside the lock. Storage has its own lock (`check_same_thread=False` for SQLite).
 
-## Key behaviors (unchanged from v1)
+## Key behaviors
 
 - **Warm start**: init fits from existing storage if `count > 0`.
-- **Auto-retrain**: triggered when `store.count_since(version) >= config.retrain_every_n`.
+- **Auto-retrain**: triggered when `store.count_since(_last_retrain_at) >= config.retrain_every_n`. Uses datetime-based counting (`after: datetime`) — NOT version-string matching. `_last_retrain_at` advances after each successful retrain so the counter resets correctly.
 - **Heuristic fallback**: retained for cold start and unseen `task_type`s.
+- **Drift detection**: `drift_status()` returns `DriftReport | None`. After a successful lambdarank full fit, `DriftDetector.set_reference()` is called; subsequent retrains check drift (non-blocking — logged, not gate-blocking).
 
 ## Testing
 

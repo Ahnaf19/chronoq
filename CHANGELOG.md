@@ -4,6 +4,69 @@ All notable changes to Chronoq. Format loosely based on [Keep a Changelog](https
 
 ## [Unreleased] — v2 in progress
 
+### Chunk 4 — Polish + promo (2026-04-22)
+
+Branch `v2/chunk-4-polish`.
+
+**Bug fixes (Steps 1-4):**
+- `count_since()` retrain loop: changed `TelemetryStore.count_since()` ABC from version-string matching to `after: datetime` parameter; `SqliteStore` queries `WHERE recorded_at > ?`; `MemoryStore` filters by `recorded_at`. `TaskRanker` now tracks `_last_retrain_at: datetime` — auto-retrain correctly fires on every threshold crossing, not just the first.
+- Train-serve feature skew: `LearnedScheduler.record_completion()` now snapshots `TypeStatsTracker` and passes `metadata={"recent_mean_ms_this_type": ..., "queue_depth": ..., ...}` to `ranker.record()` so LambdaRank trains on real queue context features.
+- Task ID collision: `LearnedScheduler.submit()` raises `ValueError("task_id already registered: ...")` on duplicate task_id instead of silently overwriting registry.
+- Registry leak: `attach_signals()` now wires `task_revoked` → `cleanup_registry(task_id)`; cancelled tasks no longer leave orphaned registry entries.
+
+**Schema (Step 2):**
+- `RetrainResult.rejected: bool = False` — `retrain()` reads `metrics.get("_rejected", False)` from LambdaRank and propagates it. Callers can now detect whether a trained model was rejected.
+
+**Storage hardening (Step 1 side-effects):**
+- `SqliteStore`: added `PRAGMA journal_mode=WAL`; created indices on `recorded_at`, `task_type`, `model_version_at_record`.
+
+**Test quality (Step 5):**
+- Added `@settings(deadline=None)` to all 8 Hypothesis property tests in `test_lambdarank_hypothesis.py`.
+- `tests/ranker/test_retrain_trigger.py` (NEW — 2 tests): verifies `_last_retrain_at` advances and auto-retrain fires on every threshold crossing.
+- `tests/ranker/test_schemas.py`: added `test_rejected_defaults_to_false`, `test_rejected_true_when_set`.
+- `tests/celery/test_scheduler.py` `TestRegistryIntegrity`: `test_submit_duplicate_task_id_raises`, `test_registry_empty_after_cleanup`, `test_registry_empty_after_record_completion`.
+- `tests/celery/test_signals.py`: `test_task_revoked_cleans_registry`.
+
+**RankerConfig hyperparams (Step 6):**
+- `RankerConfig` now exposes `num_leaves: int = 31`, `n_estimators: int = 500`, `learning_rate: float = 0.05`, `min_data_in_leaf: int = 20`.
+- `LambdaRankEstimator` reads these from config; module-level constants removed.
+
+**DriftDetector wiring (Step 7):**
+- `TaskRanker.__init__` initializes a `DriftDetector` with the current config and extractor.
+- `retrain()` runs a non-blocking drift check before each refit (skips silently on first run); after a successful lambdarank refit, calls `set_reference(records)`.
+- `drift_status()` returns `DriftReport | None` (the last known drift report, or None before first lambdarank refit).
+
+**PyPI metadata + packaging (Step 8):**
+- All four packages (`chronoq-ranker`, `chronoq-bench`, `chronoq-celery`, `chronoq-demo-server`) now have `authors`, `license`, `keywords`, `classifiers`, `[project.urls]`.
+- Version bumps: `chronoq-ranker` 0.1.0→0.2.0, `chronoq-bench` 0.1.0→0.2.0, `chronoq-celery` 0.1.0→0.2.0 (was already 0.1.0 — see note), `chronoq-demo-server` 0.1.0→0.2.0.
+- `ranker/chronoq_ranker/py.typed` created (PEP 561).
+- `requires-python` lowered to `>=3.10` across all packages.
+
+**CI (Step 9):**
+- `test` job now runs a matrix across Python 3.10, 3.11, 3.12.
+- `pytest` step adds `--cov=chronoq_ranker --cov=chronoq_celery --cov-report=term-missing`.
+
+**Wiring:**
+- Hero plot embedded in `README.md` (`bench/artifacts/jct_vs_load.png`).
+- "v2 in progress" banner replaced with "Chunks 0–4 complete · PyPI-ready".
+- Python badge updated to 3.10|3.11|3.12.
+
+**Exit criteria:**
+
+| Criterion | Result |
+|---|---|
+| `test_auto_retrain_fires_multiple_times` | PASS |
+| `test_count_since_resets_after_retrain` | PASS |
+| `test_rejected_defaults_to_false` + `test_rejected_true_when_set` | PASS |
+| `test_submit_duplicate_task_id_raises` | PASS |
+| `test_task_revoked_cleans_registry` | PASS |
+| `test_drift_status_returns_report_after_lambdarank_retrain` | PASS |
+| Tests total | **225** |
+| Lint | 0 errors |
+| `RankerConfig(num_leaves=64)` | no error |
+| `drift_status()` returns real `DriftReport` | verified by test |
+| Boundary check | clean |
+
 ### Chunk 3 — `chronoq-celery` integration (2026-04-22)
 
 Branch `v2/chunk-3-celery`.

@@ -1,8 +1,8 @@
-# Chronoq (v2 in progress)
+# Chronoq
 
 Learning-to-rank scheduling library for Python job queues. Replaces FIFO/static-priority ordering with online-learning LambdaRank trained on job-duration telemetry.
 
-**Phase:** Chunk 3 shipped (`chronoq-celery` — `LearnedScheduler` with shadow/active/fifo modes, +55% mean JCT vs FIFO on 200-task Pareto demo, 32 tests). Chunks 0–3 complete; Chunk 4 next (Polish + promo: PyPI releases, blog post, hero README). Full plan: `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md`. v2 docs: `docs/v2/`.
+**Phase:** Chunks 0–4 complete. Chunk 4 shipped: bug fixes (count_since datetime, feature skew, registry integrity, task_revoked wiring), `RankerConfig` hyperparams, DriftDetector wired, PyPI metadata, Python 3.10/3.12 CI, 225 tests. Full plan: `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md`. v2 docs: `docs/v2/`.
 
 ## Monorepo Layout
 
