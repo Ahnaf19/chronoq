@@ -17,7 +17,7 @@ class RankerConfig:
     drift_threshold_mae_ms: float = 500.0
     """Rolling MAE over this threshold signals drift (paired with PSI in drift.py)."""
 
-    # --- LambdaRank incremental-fit contract (Chunk 1 W3) ---
+    # --- LambdaRank incremental-fit contract ---
     incremental_rounds: int = 10
     """New boosting rounds added via ``init_model`` warm-start on each incremental fit."""
 
@@ -27,9 +27,14 @@ class RankerConfig:
     full_refit_every_n_incrementals: int = 20
     """Force a full refit every N incremental fits to bound accumulation drift."""
 
-    # --- Drift detection (Chunk 1 W3) ---
+    # --- Drift detection ---
     psi_threshold: float = 0.2
     """PSI per-feature: warn above this, flag as drift above 0.3 (hard-coded ratio)."""
+
+    # --- Fallback behavior ---
+    allow_degrade: bool = True
+    """Fall back to GradientEstimator when LambdaRank raises InsufficientGroupsError.
+    Set to False to fail loud instead (required if you want strict LTR-only behavior)."""
 
     # --- I/O ---
     feature_columns: list[str] = field(

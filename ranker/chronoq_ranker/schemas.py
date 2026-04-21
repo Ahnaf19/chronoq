@@ -5,7 +5,26 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-ModelTypeLiteral = Literal["heuristic", "gradient_boosting", "lambdarank"]
+ModelTypeLiteral = Literal[
+    "heuristic", "gradient_boosting", "lambdarank", "oracle_sjf", "oracle_srpt"
+]
+
+
+class InsufficientGroupsError(ValueError):
+    """Raised when there are fewer valid ranking groups than required for LambdaRank fitting.
+
+    A valid group has at least 2 records. LambdaRank requires ``min_groups`` of them.
+    Set ``config.allow_degrade=True`` to fall back to the gradient estimator instead.
+    """
+
+    def __init__(self, actual: int, required: int) -> None:
+        super().__init__(
+            f"LambdaRank requires at least {required} groups of size ≥2; found {actual}. "
+            "Accumulate more records or lower config.min_groups. "
+            "Set config.allow_degrade=True to fall back silently."
+        )
+        self.actual = actual
+        self.required = required
 
 
 class TaskRecord(BaseModel):
@@ -55,6 +74,26 @@ class RetrainResult(BaseModel):
     samples_used: int
     model_version: str
     promoted: bool
+    model_type: ModelTypeLiteral | None = None
+    # Ranking metrics (populated for lambdarank; None for heuristic/gradient).
+    spearman_rho: float | None = None
+    pairwise_accuracy: float | None = None
+    kendall_tau: float | None = None
+
+
+class DriftReport(BaseModel):
+    """Output of a DriftDetector check.
+
+    ``overall_status`` is the worst-case status across all features:
+    "stable" → all PSI < warn_threshold; "warn" → at least one above warn but below drift;
+    "drift" → at least one feature PSI above the drift threshold (0.3).
+    """
+
+    per_feature_psi: dict[str, float]
+    overall_status: Literal["stable", "warn", "drift"]
+    rolling_mae_delta: float = 0.0
+    drifted_features: list[str] = Field(default_factory=list)
+    warned_features: list[str] = Field(default_factory=list)
 
 
 class FeatureSchema(BaseModel):
@@ -107,8 +146,8 @@ class QueueContext(BaseModel):
 class ScoredTask(BaseModel):
     """A single candidate's score + rank from ``TaskRanker.predict_scores``.
 
-    ``score`` is the raw estimator output (currently estimated duration in ms;
-    in Chunk 1 W3 lambdarank lands and this becomes a relative pairwise score).
+    ``score`` is the raw estimator output (estimated duration in ms for
+    heuristic/gradient; negated pairwise rank score for lambdarank).
     **Lower score = scheduled sooner.** ``rank`` is 0-indexed within the
     returned batch after sorting.
     """
