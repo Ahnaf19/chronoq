@@ -1,211 +1,134 @@
-# Chronoq
+# Chronoq (v2 in progress)
 
-Self-optimizing task queue with ML-based Shortest Job First (SJF) scheduling.
+Learning-to-rank scheduling library for Python job queues. Replaces FIFO/static-priority ordering with online-learning LambdaRank trained on job-duration telemetry.
+
+**Phase:** Chunk 0 (scaffold + `.claude/` team + docs restructure). Branch `v2/scaffold`. Full plan: `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md`. v2 docs (when Weekend 3 ships): `docs/v2/`.
 
 ## Monorepo Layout
 
 ```
 chronoq/
-├── predictor/                  # Layer 1: standalone ML predictor library
-│   └── chronoq_ranker/      # Python package (predict/record/retrain)
-├── server/                     # Layer 2: FastAPI + Redis SJF queue server
-│   └── chronoq_demo_server/         # Python package (queue/scheduler/workers/api)
-├── tests/
-│   ├── predictor/              # 47 tests — schemas, storage, models, predictor, integration
-│   └── server/                 # 24 tests — queue, scheduler, worker, API, integration
-├── migrations/                 # Alembic schema migrations for SQLite telemetry
-├── docs/                       # Architecture, user guide, API reference, config, Postman
-├── .claude/commands/           # Custom slash commands (see below)
-├── demo.py                     # End-to-end demo (wave-based submission)
-├── docker-compose.yml          # Redis + app
-└── Dockerfile
+├── ranker/                    # chronoq-ranker — ML library (v1 regressor, becomes LTR in Chunk 1)
+├── bench/                     # chronoq-bench — simulator + traces + baselines (Chunk 2)
+├── integrations/celery/       # chronoq-celery — Celery plugin (Chunk 3)
+├── demo-server/               # reference FastAPI+Redis integration (v1 demoted)
+├── tests/                     # tests/{ranker,bench,celery,demo_server}/
+├── docs/                      # Chunk 0 W3: split into docs/v1/ and docs/v2/
+└── .claude/                   # agents, commands, settings — see §Claude Team
 ```
+
+**Workspace members** (root `pyproject.toml`): `ranker`, `bench`, `integrations/celery`, `demo-server`. Managed by `uv`.
 
 ## Critical Boundaries
 
-- **chronoq-predictor MUST NEVER import from chronoq-server.** It is a standalone library with zero Redis/FastAPI/queue dependencies. Verify: `grep -r "chronoq_demo_server" predictor/` must return nothing.
-- **chronoq-server depends on chronoq-predictor** via uv workspace source resolution (`[tool.uv.sources]` in its pyproject.toml).
-- Run `/boundary-check` to verify this at any time.
+- **`chronoq-ranker` MUST NEVER import from `chronoq-demo-server`, Redis, FastAPI, Celery, or vLLM.** It is a standalone library.
+- Verify: `grep -r "chronoq_demo_server\|fastapi\|celery" ranker/` returns nothing.
+- Run `/boundary-check` at any time.
 
 ## Tech Stack
 
-- **Python 3.11**, uv workspace monorepo (root pyproject.toml defines workspace members)
-- **Predictor**: Pydantic v2 (schemas), scikit-learn (GradientBoostingRegressor), loguru (logging), sqlite3 stdlib (storage)
-- **Server**: FastAPI + uvicorn (API), redis-py async (sorted set queue), loguru
-- **Testing**: pytest + pytest-asyncio (asyncio_mode="auto"), fakeredis[lua] (no real Redis needed), httpx (FastAPI test client)
-- **Linting**: Ruff — `line-length=100`, `target-version="py311"`, `select=["E","F","W","I","N","UP","B","A","SIM","TCH"]`, double quotes
-- **CI**: GitHub Actions (`.github/workflows/ci.yml`) — lint + test on push/PR to main
+- Python 3.11, `uv` workspace
+- **Ranker** (Chunk 1+): Pydantic v2, LightGBM `LGBMRanker` (lambdarank objective), loguru, sqlite3 stdlib. No pandas in runtime.
+- **Bench** (Chunk 2+): SimPy, matplotlib, pyarrow, huggingface_hub, pandas.
+- **Celery integration** (Chunk 3+): Celery 5.4+, redis-py.
+- **Demo-server** (kept for reference): FastAPI, uvicorn, redis-py async.
+- **Testing**: pytest + pytest-asyncio (auto mode), fakeredis[lua], hypothesis (Chunk 1+).
+- **Lint**: ruff — line-length 100, target-version py311, double quotes.
+- **CI**: GitHub Actions — lint + test on push/PR.
 
 ## Conventions
 
-- Type hints on all public functions. Use `X | None` union style, never `Optional[X]`.
-- Google-style docstrings on public classes and methods.
-- `from __future__ import annotations` where needed for forward refs. Type-only imports in `TYPE_CHECKING` blocks.
-- `datetime.now(UTC)` for timestamps (using `datetime.UTC`).
-- Thread safety: `threading.Lock` protects only `_estimator` reference swap in `predictor.py`. Fitting happens outside the lock.
-- Storage: `SqliteStore` uses its own `threading.Lock` + `check_same_thread=False`.
-- Async workers: `asyncio.to_thread()` for blocking predictor calls (retrain) from async context.
-- Commit messages: conventional prefixes (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `style:`, `ci:`).
+- Type hints on all public functions. `X | None`, never `Optional[X]`.
+- Google-style docstrings on public classes/methods.
+- `from __future__ import annotations` + `TYPE_CHECKING` blocks for forward refs.
+- `datetime.now(UTC)` with `from datetime import UTC, datetime`.
+- Thread safety: `threading.Lock` in `ranker/ranker.py` protects only the estimator reference swap. Fitting happens outside the lock.
+- Storage: `SqliteStore` has its own `threading.Lock` + `check_same_thread=False`.
+- Async workers: `asyncio.to_thread()` for blocking ranker calls.
 
 ## Git Conventions
 
 **Signature and format:**
-- **Never add Claude signatures to commits.** No "Co-Authored-By: Claude", no "🤖 Generated with Claude Code", no attribution footers. The user is the sole author.
+- **Never add Claude signatures.** No "Co-Authored-By: Claude", no "🤖 Generated with Claude Code", no attribution footers. User is sole author.
 - Conventional prefixes: `feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`, `style:`, `ci:`, `perf:`, `build:`.
-- Subject line: imperative mood, <72 chars. Body wraps at 100.
-- Use HEREDOC for multi-line messages to preserve formatting.
+- Subject imperative, <72 chars. Body wraps at 100. HEREDOC for multi-line.
 
-**Commit granularity — split large changes into logical commits:**
-- **Don't make one huge commit when changes span multiple concerns.** A "big bang" commit is hard to review, hard to revert, and loses the story of why each change was made.
-- Divide work into logical clusters. One commit = one coherent intent the reader can understand from the subject line alone.
-- Good cluster boundaries: one package vs another, rename vs behavior change, schema vs implementation, test fixtures vs production code, config vs code, infra vs app.
-- Example (v2 scaffolding): **bad** — one commit "v2 migration" with 60 files. **Good** — four commits: (1) rename predictor→ranker, (2) rename server→demo-server, (3) delete migrations/, (4) add bench/celery stubs.
-- If a change series spans chunks (e.g., Chunk 0 Weekend 1 → Weekend 2), each weekend/sub-step gets its own commit or PR.
-- When in doubt, err toward more commits, not fewer. They can be squashed at merge if desired; they cannot be un-merged.
+**Granularity — split large changes into logical commits:**
+- One commit = one coherent intent readable from the subject alone.
+- Good boundaries: per-package, rename vs behavior change, schema vs impl, tests vs prod, config vs code.
+- When in doubt, more commits. Squash at merge if desired; cannot un-merge.
 
 **Safety:**
-- Do not amend published commits — create new ones.
-- No `--no-verify`, `--force`, or `--amend` on pushed commits without explicit user request.
-- Stage specific files (`git add path/to/file`) over `git add -A` when the working tree has mixed concerns — prevents accidental inclusion of unrelated WIP.
+- Don't amend published commits.
+- No `--no-verify`, `--force`, `--amend` on pushed commits without explicit ask.
+- Prefer `git add <path>` over `git add -A` when tree has mixed concerns.
 
 ## Commands
 
 ```bash
-uv sync                                  # Install all deps (workspace)
-uv run pytest -v                         # All 71 tests
-uv run pytest tests/predictor/ -v        # Predictor tests only (47)
-uv run pytest tests/server/ -v           # Server tests only (24)
-uv run pytest --cov=chronoq_ranker --cov=chronoq_demo_server  # With coverage
-uv run ruff check .                      # Lint
-uv run ruff check . --fix                # Lint with auto-fix
-uv run ruff format .                     # Format
-uv run ruff format --check .             # Format check (CI uses this)
+uv sync                        # Install workspace
+uv run pytest -v               # All tests
+uv run ruff check .            # Lint
+uv run ruff check . --fix      # Lint + auto-fix
+uv run ruff format .           # Format
+make bench                     # (Chunk 2+) full benchmark harness
+make test / make lint / make fix
 ```
 
-## Custom Slash Commands
-
-These are defined in `.claude/commands/` and available via `/command-name`:
+## Slash Commands
 
 | Command | Purpose |
-|---------|---------|
-| `/validate` | Full validation: lint + format check + all tests. Diagnoses failures. |
-| `/test [scope]` | Run tests by scope: `predictor`, `server`, a name pattern, or all. |
-| `/fix` | Auto-fix lint/format issues, verify tests still pass, show diff. |
-| `/boundary-check` | Verify chronoq-predictor has zero imports from chronoq-server/Redis/FastAPI. |
-| `/sync-docs` | Check docs against code for staleness: API routes, config, Postman, test counts. |
-| `/coverage` | Run tests with coverage, identify untested code, suggest high-impact tests. |
+|---|---|
+| `/validate` | Lint + format + all tests |
+| `/test [scope]` | Scoped test run |
+| `/fix` | Auto-fix lint/format; verify tests |
+| `/boundary-check` | Verify ranker has zero server/framework imports |
+| `/sync-docs` | Doc/code sync check |
+| `/coverage` | Coverage report |
+| `/chunk-review [0-4]` | (v2) Verify current chunk's exit criteria |
+| `/prd-check` | (v2) WIP vs PRD functional requirements |
+| `/status` | (v2) Current chunk, progress, latest bench |
+| `/claude-audit` | (v2) Audit `.claude/` + all CLAUDE.md for staleness |
+| `/architecture-check` | (Chunk 1+) Public API drift check |
+| `/ml-review` | (Chunk 1+) Ranker code review by ml-engineer |
+| `/bench`, `/bench-smoke` | (Chunk 2+) Run benchmarks |
+| `/integration-test` | (Chunk 3+) Integration smoke test |
+| `/release [pkg]` | (Chunk 4) Release notes + QA gate + `uv publish` |
 
-## Key Files for Common Tasks
+## Claude Team
 
-### Modifying the predictor
-- Public API: `predictor/chronoq_ranker/predictor.py` (TaskPredictor class)
-- Schemas: `predictor/chronoq_ranker/schemas.py` (TaskRecord, PredictionResult, RetrainResult)
-- Config: `predictor/chronoq_ranker/config.py` (PredictorConfig dataclass)
-- Models: `predictor/chronoq_ranker/models/heuristic.py` and `gradient.py`
-- Storage: `predictor/chronoq_ranker/storage/sqlite.py` and `memory.py`
-- Exports: `predictor/chronoq_ranker/__init__.py` — update `__all__` when adding public types
+Treat Claude as a fractional team. Role subagents live in `.claude/agents/`:
 
-### Modifying the server
-- App entrypoint: `server/chronoq_demo_server/main.py` (FastAPI lifespan, router mounting)
-- Config: `server/chronoq_demo_server/config.py` (ServerConfig, env var mapping)
-- Queue: `server/chronoq_demo_server/core/queue.py` (Redis sorted set operations)
-- Scheduler: `server/chronoq_demo_server/core/scheduler.py` (bridges predictor ↔ queue)
-- Workers: `server/chronoq_demo_server/core/worker.py` (async worker pool)
-- API routes: `server/chronoq_demo_server/api/tasks.py` and `api/metrics.py`
-- Task simulation: `server/chronoq_demo_server/task_registry.py`
+- `claude-master` — meta-agent: audits `.claude/` + CLAUDE.md files; invoked at chunk starts and after any `.claude/` edit.
+- `product-manager` — BRD/PRD, feature prioritization, release notes.
+- `project-manager` — CHANGELOG, milestone tracking, chunk reviews, PR descriptions.
+- `library-architect` — public API, interface contracts, schema versioning.
+- `ml-engineer` (Chunk 1+) — ranker, features, LightGBM, drift.
+- `senior-backend-dev` (Chunk 3+) — Celery, demo-server, async.
+- `benchmark-analyst` (Chunk 2+) — bench interpretation, regression bisection.
+- `qa-validator` — runs full validation gate pre-merge.
+- `docs-writer` (Chunk 2+) — README + `docs/` sync.
 
-### Adding tests
-- Shared fixtures: `tests/conftest.py` (memory_store, predictor_config with low thresholds)
-- Server tests use fakeredis — see any `tests/server/test_*.py` for the pattern
-- Server integration tests mock `simulate_task` for speed — see `tests/server/test_integration.py`
+**Rules:**
+- Any change to public API in `ranker/chronoq_ranker/{ranker,schemas,config,features}.py` → invoke `library-architect` via `/architecture-check` FIRST.
+- End of every chunk → `/chunk-review N` (project-manager).
+- Any `.claude/` or `CLAUDE.md` edit → hook reminds to run `/claude-audit` (claude-master).
+- New feature proposal → `product-manager` updates PRD before implementation.
+- LTR pipeline doubt (features, labels, drift) → invoke `ml-engineer`, don't guess.
+- Benchmark regression >5% on any metric in `results.json` → blocks merge until explained.
 
-### Documentation updates
-- README.md — landing page (badges, Mermaid diagrams, demo output)
-- docs/architecture.md — system design, data flow, thread safety
-- docs/user-guide.md — setup, standalone usage, integration patterns
-- docs/api-reference.md — REST API with request/response examples
-- docs/configuration.md — env vars, PredictorConfig, Redis key layout
-- docs/postman/ — Postman collection + environment (update when API changes)
-- Use `/sync-docs` to check all docs for staleness after code changes.
+Full roster + invocation triggers + ownership: plan `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md` §12 (moved to `docs/v2/claude-team.md` in Weekend 3).
 
-### Database migrations
-- Alembic config: `alembic.ini` + `migrations/env.py`
-- Versions: `migrations/versions/` — numbered migration files
-- SqliteStore auto-creates the table via `CREATE TABLE IF NOT EXISTS`, so Alembic is only needed for schema evolution on existing databases.
+## Key Files
 
-## Subagent Patterns
+- Ranker public API: `ranker/chronoq_ranker/predictor.py` (renamed to `ranker.py` in Chunk 1)
+- Schemas: `ranker/chronoq_ranker/schemas.py`
+- Config: `ranker/chronoq_ranker/config.py`
+- Models: `ranker/chronoq_ranker/models/{heuristic,gradient}.py` (adds `lambdarank.py`, `oracle.py` in Chunk 1)
+- Storage: `ranker/chronoq_ranker/storage/{sqlite,memory}.py`
+- Shared test fixtures: `tests/conftest.py`
+- Per-package CLAUDE.md exists under `ranker/`, `demo-server/`, `tests/` (and later `bench/`, `integrations/celery/`, `docs/`).
 
-Use the Agent tool for tasks that benefit from parallel exploration or deep codebase search without polluting the main conversation context.
+## Subagents
 
-### Recommended subagent uses
-
-**Codebase exploration** (subagent_type=Explore):
-- "Find all places where PredictionTracker is instantiated or used"
-- "Trace the data flow from POST /tasks through to worker completion"
-- "Find all Pydantic models and their field definitions across both packages"
-
-**Parallel research** (subagent_type=Explore, multiple calls):
-- When investigating a bug: spawn one agent to trace the predictor path and another to trace the server path
-- When adding a feature that touches both packages: one agent reads predictor code, another reads server code
-
-**Parallel validation** (multiple Agent calls):
-- Run boundary check + lint + tests concurrently via separate agents
-- Check docs/API consistency + run test coverage concurrently
-
-### When NOT to use subagents
-- Simple single-file edits — just read and edit directly
-- Running a single command — use Bash directly
-- Reading 1-2 known files — use Read directly
-
-## Workflow: Common Scenarios
-
-### Adding a new API endpoint
-1. Add route in `server/chronoq_demo_server/api/tasks.py` or `api/metrics.py`
-2. Add Pydantic request/response models in the same file (or schemas.py if shared)
-3. Wire up in `main.py` if adding a new router
-4. Add test in `tests/server/test_api_*.py`
-5. Run `/validate`
-6. Run `/sync-docs` to update api-reference.md and Postman collection
-
-### Adding a new storage backend
-1. Create `predictor/chronoq_ranker/storage/newbackend.py` implementing `TelemetryStore`
-2. Add URI dispatch in `storage/__init__.py` `create_store()`
-3. Add tests in `tests/predictor/test_newbackend_storage.py`
-4. Run `/boundary-check` to verify no server imports leaked in
-5. Update docs/configuration.md with the new URI pattern
-
-### Adding a new model type
-1. Create `predictor/chronoq_ranker/models/newmodel.py` extending `BaseEstimator`
-2. Update promotion logic in `predictor.py` `retrain()` method
-3. Add `model_type` string to `PredictionResult.model_type` Literal in schemas.py
-4. Add tests in `tests/predictor/test_newmodel.py`
-5. Run `/validate`
-
-### Fixing a bug
-1. Write a failing test that reproduces the bug
-2. Fix the code
-3. Run `/test` for the relevant scope
-4. Run `/validate` for full suite
-5. Run `/boundary-check` if changes touched predictor imports
-
-### Updating after code changes
-1. Run `/validate` — catches lint, format, and test failures
-2. Run `/sync-docs` — catches stale documentation
-3. Run `/boundary-check` — catches accidental import leaks
-
-## Architecture Quick Reference
-
-```
-Client → POST /tasks → Scheduler.score_and_enqueue()
-                          ├─ predictor.predict() → estimated_ms
-                          └─ queue.enqueue(score=estimated_ms) → Redis ZADD
-                                                                    ↓
-Worker ← queue.dequeue() ← Redis ZPOPMIN (lowest score = shortest job)
-   ↓
-   execute task → measure actual_ms
-   ↓
-   scheduler.report_completion() → predictor.record()
-                                      ↓
-                                   auto-retrain if count_since >= retrain_every_n
-                                   auto-promote heuristic → gradient after cold_start_threshold
-```
+Use the `Agent` tool for open-ended codebase exploration (`subagent_type=Explore`) or role-based work (`subagent_type=<role from Claude Team>`). Don't use subagents for single-file reads or single-command runs.
