@@ -24,6 +24,12 @@ CREATE TABLE IF NOT EXISTS telemetry (
 )
 """
 
+_CREATE_INDICES = (
+    "CREATE INDEX IF NOT EXISTS idx_telemetry_recorded_at ON telemetry (recorded_at)",
+    "CREATE INDEX IF NOT EXISTS idx_telemetry_task_type ON telemetry (task_type)",
+    "CREATE INDEX IF NOT EXISTS idx_telemetry_model_version ON telemetry (model_version_at_record)",
+)
+
 # Columns added in v2; ALTER applied defensively for DBs created by v1.
 _V2_COLUMNS = (
     ("group_id", "TEXT"),
@@ -39,12 +45,15 @@ class SqliteStore(TelemetryStore):
         self._db_path = uri.removeprefix("sqlite:///")
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute(_CREATE_TABLE)
         for col, decl in _V2_COLUMNS:
             # Column already exists on fresh DBs (via CREATE TABLE above);
             # ALTER raises on duplicate — suppress for idempotency.
             with contextlib.suppress(sqlite3.OperationalError):
                 self._conn.execute(f"ALTER TABLE telemetry ADD COLUMN {col} {decl}")
+        for stmt in _CREATE_INDICES:
+            self._conn.execute(stmt)
         self._conn.commit()
 
     def save(self, record: TaskRecord) -> None:
@@ -92,11 +101,12 @@ class SqliteStore(TelemetryStore):
             row = self._conn.execute("SELECT COUNT(*) FROM telemetry").fetchone()
         return row[0]
 
-    def count_since(self, model_version: str) -> int:
+    def count_since(self, after: datetime) -> int:
+        """Count records with recorded_at strictly after the given datetime."""
         with self._lock:
             row = self._conn.execute(
-                "SELECT COUNT(*) FROM telemetry WHERE model_version_at_record = ?",
-                (model_version,),
+                "SELECT COUNT(*) FROM telemetry WHERE recorded_at > ?",
+                (after.isoformat(),),
             ).fetchone()
         return row[0]
 

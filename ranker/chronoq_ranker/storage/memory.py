@@ -1,7 +1,15 @@
 """In-memory telemetry storage for testing and ephemeral use."""
 
-from chronoq_ranker.schemas import TaskRecord
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from chronoq_ranker.storage.base import TelemetryStore
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from chronoq_ranker.schemas import TaskRecord
 
 
 class MemoryStore(TelemetryStore):
@@ -22,5 +30,6 @@ class MemoryStore(TelemetryStore):
     def count(self) -> int:
         return len(self._records)
 
-    def count_since(self, model_version: str) -> int:
-        return sum(1 for r in self._records if r.model_version_at_record == model_version)
+    def count_since(self, after: datetime) -> int:
+        """Count records with recorded_at strictly after the given datetime."""
+        return sum(1 for r in self._records if r.recorded_at > after)
