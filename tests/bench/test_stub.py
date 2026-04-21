@@ -4,4 +4,4 @@ import chronoq_bench
 
 
 def test_package_importable() -> None:
-    assert chronoq_bench.__version__ == "0.1.0"
+    assert chronoq_bench.__version__ == "0.2.0"
