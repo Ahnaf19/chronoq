@@ -1,8 +1,11 @@
 """Abstract base class for prediction estimators."""
 
 from abc import ABC, abstractmethod
+from typing import Literal
 
 from chronoq_ranker.schemas import TaskRecord
+
+ModelType = Literal["heuristic", "gradient_boosting", "lambdarank"]
 
 
 class BaseEstimator(ABC):
@@ -21,5 +24,5 @@ class BaseEstimator(ABC):
         """Current model version string."""
 
     @abstractmethod
-    def model_type(self) -> str:
+    def model_type(self) -> ModelType:
         """Model type identifier."""
