@@ -2,7 +2,7 @@
 
 Standalone ML library for task duration prediction. **Zero deps on server, Redis, FastAPI, Celery, vLLM.** Verify: `grep -r "chronoq_demo_server\|fastapi\|celery" .` returns nothing.
 
-**Status:** Chunk 1 W2 shipped the rename (`TaskPredictor` → `TaskRanker`, `PredictorConfig` → `RankerConfig` with deprecation shims), the `TaskRecord` extension (`group_id`, `rank_label`, `feature_schema_version`), the `FeatureSchema` + `FeatureExtractor` + `DefaultExtractor` (15 features), and the `predict_scores(list)` batch-ranking API. Internally the ranker still scores via sklearn `GradientBoostingRegressor`. W3 remaining: `LambdaRankEstimator` (LightGBM `LGBMRanker`), `OracleRanker`, `drift.py`, and the ~40-test expansion to hit Spearman ρ ≥ 0.80 on 50k synthetic.
+**Status:** Chunk 1 W3 complete. W1 renamed `TaskPredictor` → `TaskRanker`; W2 added `FeatureSchema` + `DefaultExtractor` (15 features) + `predict_scores()` batch API; W3 added `LambdaRankEstimator` (LightGBM `LGBMRanker`), `OracleRanker`, `drift.py` (`DriftDetector` + PSI), wired LambdaRank promotion/degrade into `TaskRanker.retrain()`, and 52 new tests (lambdarank, oracle, drift, hypothesis). 137 tests passing.
 
 ## Ownership
 
@@ -75,12 +75,10 @@ Headline: **Spearman ρ**, **Kendall τ**, **pairwise accuracy** on held-out gro
 ## Testing
 
 ```bash
-uv run pytest tests/ranker/ -v              # 59 tests (47 original + 4 compat shims + 8 predict_scores)
+uv run pytest tests/ranker/ -v              # 113 tests (47 original + 4 compat + 8 predict_scores + 25 lambdarank + 8 oracle + 11 drift + 8 hypothesis + 2 features)
 ```
 
-Chunk 1+: add `hypothesis` property tests on rank invariance (swapping within-group features preserves ordering by ρ ≥ 0.95).
-
-Tests use `memory://` storage and low thresholds (`cold_start_threshold=10`, `retrain_every_n=20`) via `conftest.py`.
+Uses `memory://` storage and low thresholds (`cold_start_threshold=10`, `retrain_every_n=20`) via `conftest.py`. Hypothesis property tests in `test_lambdarank_hypothesis.py`: rank-label monotonicity, ρ range [-1,1], pairwise accuracy range [0,1], PSI non-negative.
 
 ## When modifying
 
