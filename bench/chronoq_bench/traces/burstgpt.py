@@ -24,6 +24,7 @@ from chronoq_bench.traces.cache import (
 # Fail loudly if these change between dataset revisions.
 _REQUIRED_COLS = {"request_id", "timestamp", "input_length", "output_length", "duration_ms"}
 
+
 # Mapping BurstGPT columns → TraceJob fields
 class BurstGPTLoader(TraceLoader):
     """Load BurstGPT LLM request traces as TraceJob sequences.

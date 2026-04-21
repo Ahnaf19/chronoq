@@ -17,11 +17,11 @@ from chronoq_bench.traces.base import TraceJob, TraceLoader
 
 # Task type profiles: (mean_log_ms, sigma_log) — log-normal base duration
 _TASK_PROFILES: dict[str, tuple[float, float]] = {
-    "resize":    (3.0, 0.4),   # ~20ms
-    "analyze":   (4.5, 0.4),   # ~90ms
-    "compress":  (5.0, 0.4),   # ~150ms
-    "encode":    (6.0, 0.4),   # ~400ms
-    "transcode": (7.5, 0.4),   # ~1800ms
+    "resize": (3.0, 0.4),  # ~20ms
+    "analyze": (4.5, 0.4),  # ~90ms
+    "compress": (5.0, 0.4),  # ~150ms
+    "encode": (6.0, 0.4),  # ~400ms
+    "transcode": (7.5, 0.4),  # ~1800ms
 }
 
 _TASK_TYPES = list(_TASK_PROFILES)
