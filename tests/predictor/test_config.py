@@ -1,6 +1,6 @@
 """Tests for PredictorConfig."""
 
-from chronoq_predictor.config import PredictorConfig
+from chronoq_ranker.config import PredictorConfig
 
 
 def test_defaults():

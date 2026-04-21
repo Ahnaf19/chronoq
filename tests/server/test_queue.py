@@ -2,7 +2,7 @@
 
 import fakeredis.aioredis
 import pytest
-from chronoq_server.core.queue import TaskQueue
+from chronoq_demo_server.core.queue import TaskQueue
 
 
 @pytest.fixture

@@ -1,8 +1,8 @@
 """Shared test fixtures."""
 
 import pytest
-from chronoq_predictor.config import PredictorConfig
-from chronoq_predictor.storage.memory import MemoryStore
+from chronoq_ranker.config import PredictorConfig
+from chronoq_ranker.storage.memory import MemoryStore
 
 
 @pytest.fixture

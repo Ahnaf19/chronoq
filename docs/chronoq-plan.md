@@ -34,10 +34,10 @@ Build two deliverables:
 
 ```
 chronoq/                          # monorepo
-├── chronoq_predictor/            # standalone library (Layer 1)
+├── chronoq_ranker/            # standalone library (Layer 1)
 │   ├── ...
 │   └── README.md
-├── chronoq_server/               # full queue system (Layer 2)
+├── chronoq_demo_server/               # full queue system (Layer 2)
 │   ├── ...
 │   └── README.md
 ├── demo.py                       # end-to-end demo script
@@ -52,7 +52,7 @@ chronoq/                          # monorepo
 ### Public API (3 methods)
 
 ```python
-from chronoq_predictor import TaskPredictor
+from chronoq_ranker import TaskPredictor
 
 predictor = TaskPredictor(storage="sqlite:///telemetry.db")
 
@@ -76,7 +76,7 @@ metrics = predictor.retrain()
 ### Directory Structure
 
 ```
-chronoq_predictor/
+chronoq_ranker/
 ├── __init__.py          # exports TaskPredictor
 ├── predictor.py         # main class — predict / record / retrain
 ├── features.py          # feature engineering (extract + transform)
@@ -397,7 +397,7 @@ features = {
 ```python
 # In rapp_worker.py — after receiving training job, before dispatching
 
-from chronoq_predictor import TaskPredictor
+from chronoq_ranker import TaskPredictor
 
 predictor = TaskPredictor(storage="sqlite:///maveric_telemetry.db")
 

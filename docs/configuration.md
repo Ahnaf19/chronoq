@@ -31,7 +31,7 @@ CHRONOQ_RETRAIN_EVERY=200
 When using `chronoq-predictor` standalone, configure via `PredictorConfig`:
 
 ```python
-from chronoq_predictor import PredictorConfig, TaskPredictor
+from chronoq_ranker import PredictorConfig, TaskPredictor
 
 config = PredictorConfig(
     cold_start_threshold=50,     # Min records for ML model promotion

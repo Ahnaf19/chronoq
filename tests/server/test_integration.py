@@ -5,11 +5,11 @@ from unittest.mock import AsyncMock, patch
 
 import fakeredis.aioredis
 import pytest
-from chronoq_predictor import PredictorConfig, TaskPredictor
-from chronoq_predictor.storage.memory import MemoryStore
-from chronoq_server.core.queue import TaskQueue
-from chronoq_server.core.scheduler import Scheduler
-from chronoq_server.core.worker import WorkerPool
+from chronoq_demo_server.core.queue import TaskQueue
+from chronoq_demo_server.core.scheduler import Scheduler
+from chronoq_demo_server.core.worker import WorkerPool
+from chronoq_ranker import PredictorConfig, TaskPredictor
+from chronoq_ranker.storage.memory import MemoryStore
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ async def test_submit_and_drain(system):
 
     assert await queue.length() == 20
 
-    with patch("chronoq_server.core.worker.simulate_task", new_callable=AsyncMock) as mock_sim:
+    with patch("chronoq_demo_server.core.worker.simulate_task", new_callable=AsyncMock) as mock_sim:
         mock_sim.return_value = 150.0
         await pool.start()
 
@@ -81,7 +81,7 @@ async def test_sjf_tendency(system):
     await scheduler.score_and_enqueue("slow-1", "generate_report", 100)
     await scheduler.score_and_enqueue("fast-2", "send_email", 100)
 
-    with patch("chronoq_server.core.worker.simulate_task", side_effect=mock_task):
+    with patch("chronoq_demo_server.core.worker.simulate_task", side_effect=mock_task):
         pool_1worker = WorkerPool(queue, scheduler, worker_count=1, poll_interval=0.01)
         await pool_1worker.start()
 

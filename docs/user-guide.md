@@ -35,7 +35,7 @@ The predictor library works independently of the server. Use it in any Python pr
 ### Basic Usage
 
 ```python
-from chronoq_predictor import TaskPredictor
+from chronoq_ranker import TaskPredictor
 
 # Create predictor with SQLite persistence
 predictor = TaskPredictor(storage="sqlite:///my_telemetry.db")
@@ -58,7 +58,7 @@ print(f"MAE: {result.mae:.1f}ms, Promoted: {result.promoted}")
 ### With Custom Configuration
 
 ```python
-from chronoq_predictor import PredictorConfig, TaskPredictor
+from chronoq_ranker import PredictorConfig, TaskPredictor
 
 config = PredictorConfig(
     cold_start_threshold=30,   # Promote to ML after 30 records (default: 50)
@@ -78,7 +78,7 @@ predictor = TaskPredictor(storage="memory://")
 
 ```python
 from celery import Celery
-from chronoq_predictor import TaskPredictor
+from chronoq_ranker import TaskPredictor
 
 app = Celery("tasks")
 predictor = TaskPredictor(storage="sqlite:///celery_telemetry.db")
@@ -102,7 +102,7 @@ def process_image(image_path: str):
 ### Integration with Kafka Workers
 
 ```python
-from chronoq_predictor import TaskPredictor
+from chronoq_ranker import TaskPredictor
 
 predictor = TaskPredictor(storage="sqlite:///kafka_telemetry.db")
 
@@ -134,7 +134,7 @@ for message in consumer:
 docker-compose up -d redis
 
 # Start the server with auto-reload
-uv run uvicorn chronoq_server.main:app --reload --port 8000
+uv run uvicorn chronoq_demo_server.main:app --reload --port 8000
 ```
 
 ### Option 2: Docker Compose
@@ -236,7 +236,7 @@ Note: The `SqliteStore` auto-creates the table on first use via `CREATE TABLE IF
 
 ## Troubleshooting
 
-### "No module named chronoq_predictor"
+### "No module named chronoq_ranker"
 Run `uv sync` to install workspace packages.
 
 ### Redis connection refused

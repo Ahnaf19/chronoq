@@ -52,7 +52,7 @@ uv run pytest tests/predictor/ -v
 uv run pytest tests/server/ -v
 
 # With coverage
-uv run pytest --cov=chronoq_predictor --cov=chronoq_server
+uv run pytest --cov=chronoq_ranker --cov=chronoq_demo_server
 ```
 
 ## Making Changes

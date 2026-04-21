@@ -1,7 +1,7 @@
 Run tests with coverage and identify untested code.
 
 ```bash
-uv run pytest --cov=chronoq_predictor --cov=chronoq_server --cov-report=term-missing --tb=short -q
+uv run pytest --cov=chronoq_ranker --cov=chronoq_demo_server --cov-report=term-missing --tb=short -q
 ```
 
 After running:

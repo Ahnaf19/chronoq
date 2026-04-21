@@ -5,11 +5,11 @@ from unittest.mock import AsyncMock, patch
 
 import fakeredis.aioredis
 import pytest
-from chronoq_predictor import PredictorConfig, TaskPredictor
-from chronoq_predictor.storage.memory import MemoryStore
-from chronoq_server.core.queue import TaskQueue
-from chronoq_server.core.scheduler import Scheduler
-from chronoq_server.core.worker import WorkerPool
+from chronoq_demo_server.core.queue import TaskQueue
+from chronoq_demo_server.core.scheduler import Scheduler
+from chronoq_demo_server.core.worker import WorkerPool
+from chronoq_ranker import PredictorConfig, TaskPredictor
+from chronoq_ranker.storage.memory import MemoryStore
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ async def test_worker_processes_task(worker_setup):
 
     await queue.enqueue("t1", "send_email", 100, 150.0)
 
-    with patch("chronoq_server.core.worker.simulate_task", new_callable=AsyncMock) as mock_sim:
+    with patch("chronoq_demo_server.core.worker.simulate_task", new_callable=AsyncMock) as mock_sim:
         mock_sim.return_value = 120.0
         await pool.start()
         await asyncio.sleep(0.2)
@@ -43,7 +43,7 @@ async def test_worker_processes_task(worker_setup):
 async def test_worker_handles_empty_queue(worker_setup):
     pool, queue, scheduler, store = worker_setup
 
-    with patch("chronoq_server.core.worker.simulate_task", new_callable=AsyncMock) as mock_sim:
+    with patch("chronoq_demo_server.core.worker.simulate_task", new_callable=AsyncMock) as mock_sim:
         mock_sim.return_value = 100.0
         await pool.start()
         await asyncio.sleep(0.1)
@@ -61,7 +61,7 @@ async def test_worker_feeds_telemetry(worker_setup):
     for i in range(3):
         await queue.enqueue(f"t{i}", "resize_image", 200, 300.0)
 
-    with patch("chronoq_server.core.worker.simulate_task", new_callable=AsyncMock) as mock_sim:
+    with patch("chronoq_demo_server.core.worker.simulate_task", new_callable=AsyncMock) as mock_sim:
         mock_sim.return_value = 280.0
         await pool.start()
         await asyncio.sleep(0.5)
@@ -73,7 +73,7 @@ async def test_worker_feeds_telemetry(worker_setup):
 async def test_worker_stop_is_clean(worker_setup):
     pool, queue, scheduler, store = worker_setup
 
-    with patch("chronoq_server.core.worker.simulate_task", new_callable=AsyncMock) as mock_sim:
+    with patch("chronoq_demo_server.core.worker.simulate_task", new_callable=AsyncMock) as mock_sim:
         mock_sim.return_value = 100.0
         await pool.start()
         await asyncio.sleep(0.05)

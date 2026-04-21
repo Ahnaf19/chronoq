@@ -2,10 +2,10 @@
 
 import fakeredis.aioredis
 import pytest
-from chronoq_predictor import PredictorConfig, TaskPredictor
-from chronoq_predictor.storage.memory import MemoryStore
-from chronoq_server.core.queue import TaskQueue
-from chronoq_server.core.scheduler import Scheduler
+from chronoq_demo_server.core.queue import TaskQueue
+from chronoq_demo_server.core.scheduler import Scheduler
+from chronoq_ranker import PredictorConfig, TaskPredictor
+from chronoq_ranker.storage.memory import MemoryStore
 
 
 @pytest.fixture

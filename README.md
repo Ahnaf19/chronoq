@@ -103,7 +103,7 @@ Starts Redis + the Chronoq server on `http://localhost:8000`.
 
 ```bash
 docker compose up -d redis
-uv run uvicorn chronoq_server.main:app --reload
+uv run uvicorn chronoq_demo_server.main:app --reload
 ```
 
 ### 2. Submit a task
@@ -135,7 +135,7 @@ The `model_type` will shift from `"heuristic"` to `"gradient_boosting"` after 50
 ### Using the predictor standalone
 
 ```python
-from chronoq_predictor import TaskPredictor
+from chronoq_ranker import TaskPredictor
 
 predictor = TaskPredictor(storage="sqlite:///telemetry.db")
 
@@ -260,14 +260,14 @@ The two layers are independently deployable. The predictor library has **zero de
 ```
 chronoq/
 ├── predictor/                  # Layer 1 — standalone ML library
-│   └── chronoq_predictor/      # Python package (pip-installable)
+│   └── chronoq_ranker/      # Python package (pip-installable)
 │       ├── predictor.py        # TaskPredictor: predict / record / retrain
 │       ├── models/             # HeuristicEstimator + GradientEstimator
 │       ├── storage/            # SQLite + in-memory backends
 │       ├── schemas.py          # Pydantic models
 │       └── features.py         # Feature extraction
 ├── server/                     # Layer 2 — queue system
-│   └── chronoq_server/         # Python package
+│   └── chronoq_demo_server/         # Python package
 │       ├── main.py             # FastAPI app with async lifespan
 │       ├── core/               # Queue (Redis), Scheduler, Worker pool
 │       └── api/                # REST endpoints

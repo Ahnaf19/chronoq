@@ -37,7 +37,7 @@ uv run pytest tests/predictor/ -v
 uv run pytest tests/server/ -v
 
 # With coverage
-uv run pytest --cov=chronoq_predictor --cov=chronoq_server --cov-report=term-missing
+uv run pytest --cov=chronoq_ranker --cov=chronoq_demo_server --cov-report=term-missing
 
 # Single test file
 uv run pytest tests/predictor/test_predictor.py -v

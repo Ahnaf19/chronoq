@@ -29,6 +29,6 @@ services:
       - ./predictor:/app/predictor
       - ./server:/app/server
       - ./demo.py:/app/demo.py
-    command: uv run uvicorn chronoq_server.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uv run uvicorn chronoq_demo_server.main:app --host 0.0.0.0 --port 8000 --reload
     profiles:
       - dev

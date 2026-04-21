@@ -41,7 +41,7 @@ uv run pytest -v                           # All tests
 uv run pytest tests/predictor/ -v          # Predictor only
 uv run pytest tests/server/ -v             # Server only
 uv run pytest -k "test_predictor" -v       # By name pattern
-uv run pytest --cov=chronoq_predictor --cov=chronoq_server  # With coverage
+uv run pytest --cov=chronoq_ranker --cov=chronoq_demo_server  # With coverage
 ```
 
 ## Adding Tests

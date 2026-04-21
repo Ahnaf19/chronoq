@@ -1,7 +1,7 @@
 """Tests for HeuristicEstimator."""
 
-from chronoq_predictor.models.heuristic import HeuristicEstimator
-from chronoq_predictor.schemas import TaskRecord
+from chronoq_ranker.models.heuristic import HeuristicEstimator
+from chronoq_ranker.schemas import TaskRecord
 
 
 def _make_records(task_type: str, values: list[float]) -> list[TaskRecord]:
