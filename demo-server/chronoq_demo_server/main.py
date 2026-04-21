@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
-from chronoq_ranker import PredictorConfig, TaskPredictor
+from chronoq_ranker import RankerConfig, TaskRanker
 from fastapi import FastAPI
 from loguru import logger
 
@@ -26,12 +26,12 @@ async def lifespan(app: FastAPI):
     logger.info("Connected to Redis at {}", config.redis_url)
 
     # Predictor
-    predictor_config = PredictorConfig(
+    predictor_config = RankerConfig(
         storage_uri=config.predictor_storage,
         cold_start_threshold=config.cold_start_threshold,
         retrain_every_n=config.retrain_every_n,
     )
-    predictor = TaskPredictor(config=predictor_config)
+    predictor = TaskRanker(config=predictor_config)
 
     # Core components
     queue = TaskQueue(redis_client, config.queue_key, config.task_hash_prefix)

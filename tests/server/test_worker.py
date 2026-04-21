@@ -8,15 +8,15 @@ import pytest
 from chronoq_demo_server.core.queue import TaskQueue
 from chronoq_demo_server.core.scheduler import Scheduler
 from chronoq_demo_server.core.worker import WorkerPool
-from chronoq_ranker import PredictorConfig, TaskPredictor
+from chronoq_ranker import RankerConfig, TaskRanker
 from chronoq_ranker.storage.memory import MemoryStore
 
 
 @pytest.fixture
 async def worker_setup():
     store = MemoryStore()
-    config = PredictorConfig(cold_start_threshold=50, retrain_every_n=100, storage_uri="memory://")
-    predictor = TaskPredictor(config=config, storage=store)
+    config = RankerConfig(cold_start_threshold=50, retrain_every_n=100, storage_uri="memory://")
+    predictor = TaskRanker(config=config, storage=store)
     redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
     queue = TaskQueue(redis, "test:tasks", "test:task:")
     scheduler = Scheduler(predictor, queue)

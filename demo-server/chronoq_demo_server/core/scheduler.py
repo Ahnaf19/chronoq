@@ -2,7 +2,7 @@
 
 import asyncio
 
-from chronoq_ranker import PredictionResult, TaskPredictor
+from chronoq_ranker import PredictionResult, TaskRanker
 
 from chronoq_demo_server.core.queue import TaskQueue
 
@@ -10,7 +10,7 @@ from chronoq_demo_server.core.queue import TaskQueue
 class Scheduler:
     """Coordinates prediction scoring and telemetry feedback."""
 
-    def __init__(self, predictor: TaskPredictor, queue: TaskQueue) -> None:
+    def __init__(self, predictor: TaskRanker, queue: TaskQueue) -> None:
         self._predictor = predictor
         self._queue = queue
 

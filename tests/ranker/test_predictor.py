@@ -1,23 +1,23 @@
-"""Tests for TaskPredictor orchestrator."""
+"""Tests for TaskRanker orchestrator."""
 
 import random
 import threading
 
-from chronoq_ranker.config import PredictorConfig
-from chronoq_ranker.predictor import TaskPredictor
+from chronoq_ranker.config import RankerConfig
+from chronoq_ranker.ranker import TaskRanker
 from chronoq_ranker.storage.memory import MemoryStore
 
 
 def _make_predictor(
     cold_start: int = 10, retrain_every: int = 20
-) -> tuple[TaskPredictor, MemoryStore]:
+) -> tuple[TaskRanker, MemoryStore]:
     store = MemoryStore()
-    config = PredictorConfig(
+    config = RankerConfig(
         cold_start_threshold=cold_start,
         retrain_every_n=retrain_every,
         storage_uri="memory://",
     )
-    predictor = TaskPredictor(config=config, storage=store)
+    predictor = TaskRanker(config=config, storage=store)
     return predictor, store
 
 

@@ -2,8 +2,8 @@
 
 import random
 
-from chronoq_ranker.config import PredictorConfig
-from chronoq_ranker.predictor import TaskPredictor
+from chronoq_ranker.config import RankerConfig
+from chronoq_ranker.ranker import TaskRanker
 from chronoq_ranker.storage.memory import MemoryStore
 
 
@@ -11,12 +11,12 @@ def test_full_lifecycle_heuristic_to_gradient():
     """100+ records across 3 types triggers heuristic->gradient promotion."""
     random.seed(42)
     store = MemoryStore()
-    config = PredictorConfig(
+    config = RankerConfig(
         cold_start_threshold=50,
         retrain_every_n=50,
         storage_uri="memory://",
     )
-    predictor = TaskPredictor(config=config, storage=store)
+    predictor = TaskRanker(config=config, storage=store)
 
     task_profiles = {
         "fast": (100, 20),
@@ -44,20 +44,20 @@ def test_full_lifecycle_heuristic_to_gradient():
 def test_sqlite_persistence_lifecycle(tmp_path):
     """New predictor on same DB should warm-start correctly."""
     db_uri = f"sqlite:///{tmp_path}/lifecycle.db"
-    config = PredictorConfig(
+    config = RankerConfig(
         cold_start_threshold=10,
         retrain_every_n=100,
         storage_uri=db_uri,
     )
 
     # First predictor: record data
-    p1 = TaskPredictor(config=config, storage=db_uri)
+    p1 = TaskRanker(config=config, storage=db_uri)
     random.seed(42)
     for _ in range(20):
         p1.record("task_a", random.randint(100, 500), 200.0 + random.gauss(0, 30))
 
     # Second predictor on same DB: should warm-start
-    p2 = TaskPredictor(config=config, storage=db_uri)
+    p2 = TaskRanker(config=config, storage=db_uri)
     result = p2.predict("task_a", 300)
     assert result.model_type == "gradient_boosting"  # 20 > cold_start_threshold of 10
 
