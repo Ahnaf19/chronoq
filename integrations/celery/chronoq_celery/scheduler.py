@@ -208,8 +208,6 @@ class LearnedScheduler:
             estimator = self._ranker._estimator  # type: ignore[attr-defined]
 
         with self._lock:
-            # Count tasks of same type waiting in heap
-            sum(1 for _, _, _, _ in self._heap)  # rough approximation
             queue_depth = len(self._heap)
             same_type_count = Counter(
                 self._registry.get(t, {}).get("task_type", "")

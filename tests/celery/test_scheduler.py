@@ -15,7 +15,7 @@ class TestFifoMode:
         scheduler.submit("resize", 1024, lambda: called.append(1))
         assert called == [1]
 
-    def test_fifo_ranker_never_instantiated(self):
+    def test_fifo_never_calls_ranker(self):
         scheduler = LearnedScheduler(mode="fifo")
         assert scheduler._ranker is None
         assert scheduler._extractor is None
@@ -34,7 +34,7 @@ class TestFifoMode:
 
 
 class TestShadowMode:
-    def test_shadow_calls_apply_fn_in_arrival_order(self):
+    def test_shadow_mode_identical_to_fifo(self):
         stats = TypeStatsTracker()
         stats.seed({"resize": 100.0, "transcode": 5000.0})
         scheduler = LearnedScheduler(mode="shadow", stats_tracker=stats)
@@ -96,7 +96,7 @@ class TestActiveMode:
         with scheduler._lock:
             assert len(scheduler._heap) == 0
 
-    def test_active_score_order_low_score_first(self):
+    def test_active_mode_dispatches_in_score_order(self):
         """Tasks with lower predicted score should dispatch before higher-scored ones.
 
         We mock _score so the test covers heap/dispatch logic without needing a

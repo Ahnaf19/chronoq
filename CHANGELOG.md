@@ -4,6 +4,43 @@ All notable changes to Chronoq. Format loosely based on [Keep a Changelog](https
 
 ## [Unreleased] — v2 in progress
 
+### Chunk 3 — `chronoq-celery` integration (2026-04-22)
+
+Branch `v2/chunk-3-celery`.
+
+**Core library (Steps 1-5):**
+- `TypeStatsTracker` (`rolling.py`): per-type ring buffer (`dict[str, deque[float]]` + `threading.Lock`); `record()`, `snapshot()` (mean/p95/count), and `seed()` for cold-start pre-warming
+- `LearnedScheduler` (`scheduler.py`): pre-broker gate with three modes — `fifo` (ranker never instantiated, zero overhead), `shadow` (score+log, arrival order preserved), `active` (heap dispatch in score order). Heap: `list[tuple[float, int, Callable, str]]` with stable tiebreaking via arrival_counter. Scoring path replicates bench's `LambdaRankScheduler._score()` — calls extractor+estimator directly so each candidate gets its own `QueueContext.recent_mean_ms_this_type`
+- `attach_signals()` (`signals.py`): wires `task_prerun` → `record_start()`, `task_success` → `record_completion()` + `dispatch_next()`, `task_failure` → `cleanup_registry()` only (no ranker.record on failure)
+- `__init__.py` real exports; version `0.2.0`
+
+**Tests (Step 6) — 32 tests, no Docker/Redis:**
+- `test_rolling.py` (9): mean/p95 accuracy, window eviction, thread safety, seed pre-warming, multi-type independence
+- `test_scheduler.py` (19): `test_fifo_never_calls_ranker`, `test_shadow_mode_identical_to_fifo`, `test_active_mode_dispatches_in_score_order` (plan exit-criteria names), heap populate/clear, record_completion, cleanup_registry, ranker.record not called on cleanup
+- `test_signals.py` (4): attach_signals wiring, registry population, fifo short-circuit
+
+**Demo + docs (Step 7):**
+- `integrations/celery/demo.py`: inline Pareto generation (no `chronoq_bench` import); pre-trains LambdaRank on 800 jobs with `recent_mean_ms_this_type` embedded in metadata; seeds `TypeStatsTracker`; compares 200-task fifo vs active scheduling; asserts ≥15% mean JCT improvement
+- `docs/v2/INTEGRATIONS.md`: install, 3-step quickstart (create scheduler, attach signals, submit), modes table, `TypeStatsTracker` seeding, training guide, demo output, limitations, Hatchet/vLLM deferred sections
+
+**Wiring (Step 8):**
+- `Makefile`: `celery-demo` target (`uv run python integrations/celery/demo.py`)
+- `README.md` + `docs/v2/README.md`: Chunk 3 marked complete
+- `tests/CLAUDE.md`: updated count (216 tests)
+
+**Exit criteria (all met):**
+
+| Criterion | Result | Target |
+|---|---|---|
+| `test_fifo_never_calls_ranker` | PASS | pass |
+| `test_shadow_mode_identical_to_fifo` | PASS | pass |
+| `test_active_mode_dispatches_in_score_order` | PASS | pass |
+| demo.py mean JCT (active vs fifo) | **+55.0%** (fifo 155,819ms → active 70,046ms) | ≥15% ✅ |
+| Tests total | **216** | ≥207 ✅ |
+| Lint | 0 errors | clean ✅ |
+| Boundary check (`grep -r "celery" ranker/`) | nothing | nothing ✅ |
+| `docs/v2/INTEGRATIONS.md` | exists, 3-step quickstart | exists ✅ |
+
 ### Chunk 2 — `chronoq-bench` + money plot (2026-04-21)
 
 Branch `v2/chunk-2-bench`.
