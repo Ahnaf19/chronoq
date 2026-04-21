@@ -1,4 +1,4 @@
-.PHONY: help bench bench-smoke test lint fix sync clean
+.PHONY: help bench bench-smoke celery-demo test lint fix sync clean
 
 help:
 	@echo "Chronoq v2 — top-level targets:"
@@ -8,6 +8,7 @@ help:
 	@echo "  make fix          — ruff check --fix + format"
 	@echo "  make bench        — full benchmark harness (~5 min, writes bench/artifacts/)"
 	@echo "  make bench-smoke  — CI smoke bench (<60s, OFFLINE mode)"
+	@echo "  make celery-demo  — run 200-task fifo vs active JCT comparison"
 	@echo "  make clean        — remove caches"
 
 sync:
@@ -37,6 +38,9 @@ bench-smoke:
 	CHRONOQ_BENCH_SMOKE=1 CHRONOQ_BENCH_OFFLINE=1 uv run python -m chronoq_bench.experiments.jct_vs_load
 	CHRONOQ_BENCH_SMOKE=1 CHRONOQ_BENCH_OFFLINE=1 uv run python -m chronoq_bench.experiments.drift_recovery
 	CHRONOQ_BENCH_SMOKE=1 CHRONOQ_BENCH_OFFLINE=1 uv run python -m chronoq_bench.experiments.ablation_features
+
+celery-demo:
+	uv run python integrations/celery/demo.py
 
 clean:
 	find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true
