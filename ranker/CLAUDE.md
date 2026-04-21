@@ -2,7 +2,7 @@
 
 Standalone ML library for task duration prediction. **Zero deps on server, Redis, FastAPI, Celery, vLLM.** Verify: `grep -r "chronoq_demo_server\|fastapi\|celery" .` returns nothing.
 
-**Status:** v1 = point-regression (sklearn GBR) + auto-promoting heuristic. Chunk 1 replaces regressor with LightGBM `LGBMRanker` (lambdarank objective), renames `TaskPredictor` → `TaskRanker`, adds user-declarable `FeatureSchema`, adds drift detector.
+**Status:** Chunk 1 W2 shipped the rename (`TaskPredictor` → `TaskRanker`, `PredictorConfig` → `RankerConfig` with deprecation shims), the `TaskRecord` extension (`group_id`, `rank_label`, `feature_schema_version`), the `FeatureSchema` + `FeatureExtractor` + `DefaultExtractor` (15 features), and the `predict_scores(list)` batch-ranking API. Internally the ranker still scores via sklearn `GradientBoostingRegressor`. W3 remaining: `LambdaRankEstimator` (LightGBM `LGBMRanker`), `OracleRanker`, `drift.py`, and the ~40-test expansion to hit Spearman ρ ≥ 0.80 on 50k synthetic.
 
 ## Ownership
 
@@ -10,21 +10,22 @@ Standalone ML library for task duration prediction. **Zero deps on server, Redis
 - **Ranker internals** (`models/*.py`, `features.py`, `drift.py`) → `ml-engineer`. Review via `/ml-review`.
 - **Tests** → `qa-validator` for gate-running; `ml-engineer` for ranker test design.
 
-## Layout (during Chunk 1 transition)
+## Layout
 
 ```
 chronoq_ranker/
-├── __init__.py       # Public exports — v2 additions arrive in Chunk 1
-├── predictor.py      # → ranker.py in Chunk 1 (TaskPredictor → TaskRanker)
-├── schemas.py        # TaskRecord (+ group_id, rank_label, feature_schema_version in Chunk 1)
-├── config.py         # PredictorConfig → RankerConfig in Chunk 1
-├── features.py       # → FeatureExtractor + DefaultExtractor + versioned FeatureSchema (Chunk 1)
+├── __init__.py       # Public exports (TaskRanker, RankerConfig, FeatureSchema, DefaultExtractor, TaskCandidate, ScoredTask, ...) + legacy aliases via __getattr__
+├── ranker.py         # TaskRanker — orchestrator (predict / predict_scores / record / retrain)
+├── predictor.py      # DEPRECATED — 22-line shim re-exporting TaskRanker as TaskPredictor, emits DeprecationWarning on import
+├── schemas.py        # TaskRecord (+ group_id, rank_label, feature_schema_version), PredictionResult, RetrainResult, FeatureSchema, TaskCandidate, QueueContext, ScoredTask
+├── config.py         # RankerConfig (+ incremental_rounds, min_groups, full_refit_every_n_incrementals, psi_threshold); PredictorConfig alias retained
+├── features.py       # FeatureExtractor ABC + DefaultExtractor (15 features) + DEFAULT_SCHEMA_V1; private _legacy_* helpers used by ranker.py and gradient.py
 ├── models/
-│   ├── base.py       # BaseEstimator ABC (extend with incremental_fit in Chunk 1)
-│   ├── heuristic.py  # Per-type mean/std — cold-start, retained as RankByMeanEstimator
-│   ├── gradient.py   # sklearn GBR — REPLACED by lambdarank.py in Chunk 1
-│   ├── lambdarank.py # NEW Chunk 1 — LightGBM LGBMRanker (lambdarank objective)
-│   └── oracle.py     # NEW Chunk 1 — SJF/SRPT using true actual_ms (benchmarks only)
+│   ├── base.py       # BaseEstimator ABC + ModelType Literal
+│   ├── heuristic.py  # Per-type mean/std — cold-start
+│   ├── gradient.py   # sklearn GBR — used today; REPLACED by lambdarank.py in W3
+│   ├── lambdarank.py # W3 — LightGBM LGBMRanker (lambdarank objective)
+│   └── oracle.py     # W3 — SJF/SRPT using true actual_ms (benchmarks only)
 ├── storage/
 │   ├── base.py       # TelemetryStore ABC
 │   ├── memory.py     # MemoryStore — testing
@@ -74,7 +75,7 @@ Headline: **Spearman ρ**, **Kendall τ**, **pairwise accuracy** on held-out gro
 ## Testing
 
 ```bash
-uv run pytest tests/predictor/ -v           # 47 tests (moves to tests/ranker/ in Chunk 1)
+uv run pytest tests/ranker/ -v              # 59 tests (47 original + 4 compat shims + 8 predict_scores)
 ```
 
 Chunk 1+: add `hypothesis` property tests on rank invariance (swapping within-group features preserves ordering by ρ ≥ 0.95).
@@ -83,7 +84,8 @@ Tests use `memory://` storage and low thresholds (`cold_start_threshold=10`, `re
 
 ## When modifying
 
-- Any edit to `ranker.py`/`predictor.py`, `schemas.py`, `config.py`, `features.py`, `__init__.py` → `/architecture-check` FIRST (library-architect).
+- Any edit to `ranker.py`, `schemas.py`, `config.py`, `features.py`, `__init__.py`, `models/base.py`, `storage/base.py` → `/architecture-check` FIRST (library-architect).
+- `predictor.py` is a frozen deprecation shim — don't edit unless removing it in a future major bump.
 - Any edit to `models/*.py`, `features.py`, `drift.py` → `/ml-review` (ml-engineer).
 - Changing schemas → update tests + demo-server code that uses them.
 - Changing storage interface → update both Memory and Sqlite + tests.
