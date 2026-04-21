@@ -1,67 +1,53 @@
-# chronoq-predictor
+# chronoq-ranker
 
-Standalone ML library for predicting task execution time. **Zero dependency on chronoq-server, Redis, or FastAPI.**
+Standalone ML library for task duration prediction. **Zero deps on server, Redis, FastAPI, Celery, vLLM.** Verify: `grep -r "chronoq_demo_server\|fastapi\|celery" .` returns nothing.
 
-## Package Structure
+**Status:** v1 = point-regression (sklearn GBR) + auto-promoting heuristic. Chunk 1 replaces regressor with LightGBM `LGBMRanker` (lambdarank objective), renames `TaskPredictor` → `TaskRanker`, and adds user-declarable `FeatureSchema`.
+
+## Layout
 
 ```
 chronoq_ranker/
-├── __init__.py       # Public exports: TaskPredictor, PredictorConfig, PredictionResult, RetrainResult, TaskRecord
-├── predictor.py      # TaskPredictor — main orchestrator (predict/record/retrain)
-├── schemas.py        # Pydantic v2 models (TaskRecord, PredictionResult, RetrainResult)
-├── config.py         # PredictorConfig dataclass (thresholds, storage URI)
-├── features.py       # extract_features() and extract_training_features()
+├── __init__.py       # Public exports (v2 additions arrive in Chunk 1)
+├── predictor.py      # TaskPredictor — orchestrator (renamed TaskRanker in Chunk 1)
+├── schemas.py        # Pydantic: TaskRecord, PredictionResult, RetrainResult
+├── config.py         # PredictorConfig (renamed RankerConfig in Chunk 1)
+├── features.py       # extract_features (becomes FeatureExtractor + FeatureSchema in Chunk 1)
 ├── models/
-│   ├── base.py       # BaseEstimator ABC (fit, predict, version, model_type)
-│   ├── heuristic.py  # HeuristicEstimator — per-type mean/std, cold-start fallback
-│   └── gradient.py   # GradientEstimator — sklearn GBR, label-encoded task_type
+│   ├── base.py       # BaseEstimator ABC
+│   ├── heuristic.py  # Per-type mean/std — cold-start fallback (kept as baseline in v2)
+│   └── gradient.py   # sklearn GBR regressor — REPLACED by lambdarank.py in Chunk 1
 └── storage/
-    ├── base.py       # TelemetryStore ABC (save, get_all, get_by_type, count, count_since)
-    ├── memory.py     # MemoryStore — list-backed, for testing
-    ├── sqlite.py     # SqliteStore — thread-safe sqlite3 with JSON metadata
-    └── __init__.py   # create_store(uri) factory
+    ├── base.py       # TelemetryStore ABC
+    ├── memory.py     # MemoryStore — testing
+    └── sqlite.py     # SqliteStore — thread-safe, JSON metadata column
 ```
 
-## Design Patterns
+## Patterns
 
-- **Strategy pattern**: `BaseEstimator` ABC with `HeuristicEstimator` and `GradientEstimator`. To add a new model, subclass `BaseEstimator` and implement `fit()`, `predict()`, `version()`, `model_type()`.
-- **Pluggable storage**: `TelemetryStore` ABC. To add a new backend (PostgreSQL, DynamoDB, etc.), implement the 5 methods.
-- **Factory**: `create_store(uri)` in `storage/__init__.py` dispatches on URI scheme.
-- **Auto-promotion**: `predictor.retrain()` checks total record count vs `cold_start_threshold` to decide estimator type.
+- **Strategy**: `BaseEstimator` ABC. Chunk 1 adds `LambdaRankEstimator` + `OracleRanker` (SJF/SRPT baselines).
+- **Pluggable storage**: `TelemetryStore` ABC + `create_store(uri)` factory. Add backend → implement the 5 methods.
+- **Auto-promotion** (v1): `retrain()` checks total records vs `cold_start_threshold` to pick estimator type.
+- **Thread safety**: `threading.Lock` in `predictor.py` protects ONLY the `_estimator` pointer. Fit happens outside the lock. Storage has its own lock.
 
-## Thread Safety
+## Key behaviors
 
-```
-predict():  lock → read _estimator ref → unlock → call predict (no lock held)
-record():   save to storage (storage has own lock) → check auto-retrain count
-retrain():  fit new estimator (NO lock) → lock → swap _estimator ref → unlock
-```
-
-The lock is `threading.Lock` in `predictor.py`. It protects ONLY the `_estimator` pointer — never held during computation.
-
-## Key Behaviors
-
-- **Warm start**: On init, if storage has existing data, fits a model immediately.
-- **Auto-retrain**: Triggered when `store.count_since(current_model_version) >= config.retrain_every_n`.
-- **Auto-promotion**: When total records >= `cold_start_threshold`, retrain uses `GradientEstimator` instead of `HeuristicEstimator`. First promotion sets `promoted=True` in RetrainResult.
-- **Heuristic fallback**: `GradientEstimator` keeps an internal `HeuristicEstimator` for unseen task types that weren't in the training data.
-- **Confidence**: Heuristic: `1/(1 + std/max(mean, 1))`. Gradient: `max(0.1, min(1.0, 1 - mae/max(mean_pred, 1)))`.
-- **Predictions clamped**: GradientEstimator clamps predictions to >= 1.0ms.
+- **Warm start**: init fits from existing storage if `count > 0`.
+- **Auto-retrain**: triggered when `store.count_since(version) >= config.retrain_every_n`.
+- **Heuristic fallback**: `GradientEstimator` keeps an internal `HeuristicEstimator` for unseen task types.
+- **Predictions clamped**: `GradientEstimator` clamps to ≥1.0ms.
 
 ## Testing
 
 ```bash
-uv run pytest tests/predictor/ -v           # All 47 predictor tests
-uv run pytest tests/predictor/test_predictor.py -v  # Orchestrator tests
-uv run pytest tests/predictor/test_predictor_integration.py -v  # Full lifecycle
+uv run pytest tests/predictor/ -v           # 47 tests
 ```
 
-Tests use `memory://` storage and low thresholds (`cold_start_threshold=10`, `retrain_every_n=20`) via `conftest.py` fixtures.
+Tests use `memory://` storage and low thresholds (`cold_start_threshold=10`, `retrain_every_n=20`) via `conftest.py`.
 
-## When Modifying
+## When modifying
 
-- Adding a public type → update `__init__.py` `__all__` list
-- Changing schemas → check test_schemas.py, and server code that constructs/reads these types
-- Changing storage interface → update both MemoryStore and SqliteStore, plus their tests
-- Changing model interface → update both HeuristicEstimator and GradientEstimator
-- Changing features → update `features.py`, `gradient.py` (which consumes features), and test_features.py
+- **Any change to `ranker.py`/`predictor.py`, `schemas.py`, `config.py`, `features.py`, `__init__.py` → invoke `/architecture-check` FIRST** (library-architect agent).
+- Changing schemas → update tests + demo-server code that uses them.
+- Changing storage interface → update both Memory and Sqlite + tests.
+- Changing model interface → update all estimators (heuristic + gradient + coming: lambdarank + oracle).
