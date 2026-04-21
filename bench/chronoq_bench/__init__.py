@@ -1,3 +1,11 @@
-"""chronoq-bench — benchmark harness. Stub; populated in Chunk 2."""
+"""chronoq-bench — benchmark harness for chronoq-ranker.
 
-__version__ = "0.1.0"
+SimPy discrete-event simulator + BurstGPT/synthetic traces + 5 baselines +
+JCT/ranking metrics + experiments → bench/artifacts/jct_vs_load.png.
+
+Usage:
+    make bench        # full run, ~10 min
+    make bench-smoke  # 1k-record CI subset, <60s
+"""
+
+__version__ = "0.2.0"

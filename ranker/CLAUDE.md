@@ -23,7 +23,7 @@ chronoq_ranker/
 ├── models/
 │   ├── base.py       # BaseEstimator ABC + ModelType Literal
 │   ├── heuristic.py  # Per-type mean/std — cold-start
-│   ├── gradient.py   # sklearn GBR — used today; REPLACED by lambdarank.py in W3
+│   ├── gradient.py   # sklearn GBR — retained as legacy; superseded by lambdarank.py (Chunk 1 W3)
 │   ├── lambdarank.py # W3 — LightGBM LGBMRanker (lambdarank objective)
 │   └── oracle.py     # W3 — SJF/SRPT using true actual_ms (benchmarks only)
 ├── storage/

@@ -7,7 +7,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Status](https://img.shields.io/badge/status-v2%20in%20progress-yellow?style=flat-square)
 
-> ⚠️ **v2 in progress.** Repo is mid-rewrite from a FastAPI+Redis queue (v1) to a library-first structure. Current state: Chunk 0 scaffold complete. Ranker LambdaRank land in Chunk 1. First benchmark numbers land in Chunk 2. See [`docs/v2/`](docs/v2/) for design, [`docs/v1/`](docs/v1/) for the prior FastAPI+Redis architecture (still runs in `demo-server/`).
+> **v2 in progress (Chunks 0–2 complete).** `chronoq-ranker` (LightGBM LambdaRank) and `chronoq-bench` (SimPy simulator, 5 baselines) are built and tested. Celery integration lands in Chunk 3. See [`docs/v2/`](docs/v2/) for design and benchmark results, [`docs/v1/`](docs/v1/) for the prior FastAPI+Redis architecture (still runs in `demo-server/`).
 
 ---
 
@@ -36,9 +36,9 @@ chronoq/
 
 | Chunk | Status | Deliverable |
 |---|---|---|
-| 0 — Scaffold + team + docs | ⏳ in progress | workspace, `.claude/` team, docs restructure |
-| 1 — `chronoq-ranker` | pending | LightGBM LambdaRank library, Spearman ρ ≥ 0.80 target |
-| 2 — `chronoq-bench` | pending | `make bench` with 5 baselines + p99-vs-load plot |
+| 0 — Scaffold + team + docs | ✅ complete | workspace, `.claude/` team, docs restructure — 73 tests |
+| 1 — `chronoq-ranker` | ✅ complete | LightGBM LambdaRank — Spearman ρ=0.87, pairwise acc=0.89 |
+| 2 — `chronoq-bench` | ✅ complete | `make bench` — **+32% mean JCT, +17.5% p99 vs FCFS** @ load=0.7 |
 | 3 — `chronoq-celery` | pending | Drop-in Celery plugin, 15%+ JCT improvement demo |
 | 4 — Polish + promo | pending | PyPI releases, blog post, Show HN |
 
@@ -48,25 +48,45 @@ Full milestone detail: [`docs/v2/README.md`](docs/v2/README.md).
 
 ## Quick Start
 
-*(v1 demo-server; v2 install surface lands Chunk 3.)*
-
 ```bash
 git clone https://github.com/Ahnaf19/chronoq.git
 cd chronoq
 uv sync
-uv run pytest -v                # 73 tests
+uv run pytest -v                # 185 tests
 ```
 
-Run the v1 reference server:
+**Run the benchmark** (Chunk 2 — produces the money plot):
+
+```bash
+make bench          # ~5 min, writes bench/artifacts/jct_vs_load.png + results.json
+make bench-smoke    # <60s CI subset (uses bundled 100-row sample)
+```
+
+The money plot (`bench/artifacts/jct_vs_load.png`) shows LambdaRank vs 5 baselines across
+load ρ=0.3–0.9. At load=0.7: **+32% mean JCT improvement** and **+17.5% p99 improvement**
+over FCFS, within 13.4% of SJF-oracle (the theoretical upper bound).
+
+**Use the ranker library** (Chunk 1):
+
+```python
+from chronoq_ranker import TaskRanker, TaskCandidate
+
+ranker = TaskRanker(storage="sqlite:///jobs.db")
+ranker.record(task_type="resize", payload_size=2048, actual_ms=312.4)
+scored = ranker.predict_scores([
+    TaskCandidate(task_id="j1", task_type="transcode", payload_size=8000),
+    TaskCandidate(task_id="j2", task_type="resize",    payload_size=500),
+])
+# scored[0] is the job LambdaRank predicts finishes fastest
+```
+
+**v1 reference server** (demo-server, still works):
 
 ```bash
 docker compose up                # Redis + FastAPI
-# POST a task:
 curl -X POST http://localhost:8000/tasks -H 'content-type: application/json' \
   -d '{"task_type":"resize","payload_size":1024}'
 ```
-
-See [`docs/v1/user-guide.md`](docs/v1/user-guide.md) for the full v1 walkthrough.
 
 ---
 

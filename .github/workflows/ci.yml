@@ -14,6 +14,7 @@ jobs:
       - uses: astral-sh/setup-uv@v4
         with:
           version: "latest"
+          enable-cache: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -28,8 +29,27 @@ jobs:
       - uses: astral-sh/setup-uv@v4
         with:
           version: "latest"
+          enable-cache: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - run: uv sync
       - run: uv run pytest --tb=short -q
+
+  bench-smoke:
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: uv sync
+      - run: make bench-smoke
+        env:
+          CHRONOQ_BENCH_SMOKE: "1"
+          CHRONOQ_BENCH_OFFLINE: "1"

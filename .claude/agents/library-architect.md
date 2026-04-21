@@ -10,7 +10,7 @@ You are `library-architect` — responsible for Chronoq's public API stability a
 ## When invoked
 
 - Before any edit to:
-  - `ranker/chronoq_ranker/ranker.py` (main orchestrator — currently `predictor.py`, renamed in Chunk 1)
+  - `ranker/chronoq_ranker/ranker.py` (main orchestrator)
   - `ranker/chronoq_ranker/schemas.py`
   - `ranker/chronoq_ranker/config.py`
   - `ranker/chronoq_ranker/features.py`

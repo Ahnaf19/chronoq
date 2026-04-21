@@ -4,6 +4,82 @@ All notable changes to Chronoq. Format loosely based on [Keep a Changelog](https
 
 ## [Unreleased] — v2 in progress
 
+### Chunk 2 — `chronoq-bench` + money plot (2026-04-21)
+
+Branch `v2/chunk-2-bench`.
+
+**Simulator + baselines (Steps 1-4):**
+- SimPy discrete-event simulator (`bench/chronoq_bench/simulator.py`): event-driven dispatch (no polling), single-server queue, pluggable `BaseScheduler.select()` interface
+- 5 baselines: `FCFSScheduler`, `SJFOracleScheduler`, `SRPTOracleScheduler` (non-preemptive, labeled "approx"), `RandomScheduler`, `PriorityFCFSScheduler`
+- Synthetic Pareto trace generator (`SyntheticTraceLoader`): 5 task types, lognormal durations with payload-size correlation, seeded Poisson arrivals
+- JCT metrics: `mean_jct`, `p99_jct`, `hol_blocking_count`, `jains_fairness_index`, `percentile_jct`, `summarise`
+- Ranking metrics: `spearman_rho`, `pairwise_accuracy_grouped`
+- 48 new tests: `test_metrics.py` (17), `test_traces.py` (14), `test_simulator.py` (12), `test_baselines.py` (5); total suite 185
+
+**Experiments + plots (Step 5):**
+- `jct_vs_load.py`: sweeps load 0.3→0.9 (7 points), 6 schedulers; writes `jct_vs_load.png` + `results.json`
+- `drift_recovery.py`: pre-shift train → shifted workload (3× more transcodes) → 3 incremental retrain cycles; writes `drift_recovery.png`
+- `ablation_features.py`: LGBMRanker `booster_.feature_importance(gain)` for all 15 features; writes `ablation_features.csv`
+- `LambdaRankScheduler`: uses per-job `QueueContext` with `recent_mean_ms_this_type` from training data; bypasses `predict_scores()` to pass per-candidate context
+- Training fix: per-type duration stats embedded in `TaskRecord.metadata` so model learns `recent_mean_ms_this_type` as primary ranking signal
+- `bench/chronoq_bench/plots/base.py`: `save_figure()` helper
+
+**Wiring + CI + agents (Step 6):**
+- `Makefile`: `bench` and `bench-smoke` stubs replaced with real targets
+- `.github/workflows/ci.yml`: `enable-cache: true` on both setup-uv steps; `bench-smoke` job added (`needs: [test]`, <60s)
+- `.claude/agents/benchmark-analyst.md` and `docs-writer.md` added
+- `.claude/commands/bench.md` and `bench-smoke.md` added
+- `docs/v2/BENCHMARKS.md`: trace descriptions, scheduler table, result tables, limitations section
+
+**Exit criteria (synthetic Pareto trace, `n_train=800`, `n_eval=300`, seed=42):**
+
+| Metric | Result | Target |
+|---|---|---|
+| LambdaRank mean JCT vs FCFS @ load=0.7 | **+32.2%** | ≥ 10% ✅ |
+| LambdaRank p99 JCT vs FCFS @ load=0.7 | **+17.5%** | ≥ 15% ✅ |
+| LambdaRank p99 vs SJF-oracle @ load=0.7 | **13.4% gap** | ≤ 20% ✅ |
+| LambdaRank p99 JCT vs FCFS @ load=0.5 | +11.6% | ≥ 15% ⚠️ oracle-bounded |
+| `make bench-smoke` runtime | 4.4s | < 60s ✅ |
+| Tests | 185 passing | all green ✅ |
+
+Note: p99@load=0.5 target requires BurstGPT's extreme variance (500:1 short:long). SJF-oracle (upper bound) achieves exactly +11.6% on synthetic trace — LambdaRank p99 matches oracle exactly at load=0.5 (8306ms vs 8306ms). The ≥15% target is physically unreachable on this trace; it is not a model deficiency.
+
+**Key feature importances (ablation):** `recent_mean_ms_this_type` 80%, `payload_size` 20%.
+
+### Chunk 1 — `chronoq-ranker` LambdaRank library (2026-04-21)
+
+Branch `v2/chunk-1-ranker` → PR #2, merged to main.
+
+**Weekend 1 — `.claude/` additions:**
+- `ml-engineer` subagent added to `.claude/agents/`
+- `/architecture-check` and `/ml-review` slash commands
+- `ranker/CLAUDE.md` updated with LambdaRank specifics and ownership map
+
+**Weekend 2 — Rename + schema extension + feature engineering:**
+- `TaskPredictor` → `TaskRanker`; `PredictorConfig` → `RankerConfig`; `tests/predictor/` → `tests/ranker/`; deprecation shims preserve v1 imports with `DeprecationWarning`
+- `TaskRecord` extended: `group_id`, `rank_label`, `feature_schema_version`; `SqliteStore` auto-migrates
+- `RankerConfig` extended: `incremental_rounds`, `min_groups`, `full_refit_every_n_incrementals`, `psi_threshold`, `allow_degrade`
+- `FeatureSchema` + `FeatureExtractor` ABC + `DefaultExtractor` (15 features) + `DEFAULT_SCHEMA_V1`
+- `TaskRanker.predict_scores(candidates)` batch-ranking API; `ScoredTask`, `TaskCandidate`, `QueueContext` schemas
+
+**Weekend 3 — LambdaRank, Oracle, Drift + 52 new tests:**
+- `LambdaRankEstimator` (`lightgbm.LGBMRanker`, `objective="lambdarank"`): 60s tumbling group assignment, proportional label normalization (0–9), incremental warm-start via `init_model`, Spearman ρ rejection gate, per-group metrics (ρ, τ, pairwise accuracy)
+- `OracleRanker` — perfect SJF/SRPT using true `actual_ms`; benchmarks upper bound
+- `DriftDetector` — PSI per numeric feature (warn >0.2, drift >0.3) + rolling MAE tracking
+- `TaskRanker.retrain()` wired: auto-promotes heuristic → lambdarank; degrades to `GradientEstimator` on `InsufficientGroupsError` when `allow_degrade=True`
+- `lightgbm>=4.3` + `numpy>=1.26` added to ranker runtime deps; `hypothesis>=6.100` to root dev deps
+- 52 new tests: `test_lambdarank.py` (25), `test_oracle.py` (8), `test_drift.py` (11), `test_lambdarank_hypothesis.py` (8 property tests)
+
+**Exit criteria (all verified pre-merge):**
+
+| Metric | Result | Target |
+|---|---|---|
+| Spearman ρ on 50k synthetic | 0.8692 | ≥ 0.80 |
+| Pairwise accuracy | 0.8857 | ≥ 0.78 |
+| Incremental retrain (10k records) | 109.7ms | < 200ms |
+| Tests | 137 passing | ≥ 40 ranker |
+| Lint | 0 errors | clean |
+
 ### Chunk 0 — Scaffold + `.claude/` team + docs restructure (2026-04-21)
 
 Branch `v2/scaffold`. v1 → v2 repositioning from "ML-scheduled job queue" to a library-first structure: reusable ranker + benchmark harness + integration demos.
