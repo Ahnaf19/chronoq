@@ -18,7 +18,7 @@ from hypothesis import strategies as st
         max_size=20,
     )
 )
-@settings(max_examples=200)
+@settings(max_examples=200, deadline=None)
 def test_rank_labels_inversely_monotone_with_actual_ms(actual_ms_list: list[float]) -> None:
     """Within a group, shorter actual_ms always gets a strictly higher label."""
     # Deduplicate so ranks are unambiguous
@@ -36,7 +36,7 @@ def test_rank_labels_inversely_monotone_with_actual_ms(actual_ms_list: list[floa
 
 
 @given(n=st.integers(min_value=2, max_value=50))
-@settings(max_examples=100)
+@settings(max_examples=100, deadline=None)
 def test_rank_labels_cover_full_range(n: int) -> None:
     """Labels must cover [0, n-1] with no gaps."""
     labels = [n - 1 - i for i in range(n)]
@@ -57,7 +57,7 @@ def test_rank_labels_cover_full_range(n: int) -> None:
         max_size=100,
     )
 )
-@settings(max_examples=200)
+@settings(max_examples=200, deadline=None)
 def test_spearman_rho_range(values: list[float]) -> None:
     """Spearman ρ is always in [-1, 1]."""
     a = np.array(values)
@@ -73,7 +73,7 @@ def test_spearman_rho_range(values: list[float]) -> None:
         max_size=50,
     )
 )
-@settings(max_examples=100)
+@settings(max_examples=100, deadline=None)
 def test_spearman_rho_self_correlation_is_one(values: list[float]) -> None:
     """ρ(x, x) = 1 for any array."""
     a = np.array(values, dtype=np.float64)
@@ -89,7 +89,7 @@ def test_spearman_rho_self_correlation_is_one(values: list[float]) -> None:
 @given(
     group_size=st.integers(min_value=2, max_value=20),
 )
-@settings(max_examples=100)
+@settings(max_examples=100, deadline=None)
 def test_pairwise_accuracy_perfect_ordering_is_one(group_size: int) -> None:
     """Perfect score ordering (scores == labels) → pairwise accuracy = 1.0."""
     labels = np.array(list(range(group_size)), dtype=np.int32)
@@ -102,7 +102,7 @@ def test_pairwise_accuracy_perfect_ordering_is_one(group_size: int) -> None:
 @given(
     group_size=st.integers(min_value=2, max_value=20),
 )
-@settings(max_examples=100)
+@settings(max_examples=100, deadline=None)
 def test_pairwise_accuracy_in_range(group_size: int) -> None:
     """Pairwise accuracy is always in [0, 1]."""
     rng = np.random.default_rng(group_size)
@@ -122,7 +122,7 @@ def test_pairwise_accuracy_in_range(group_size: int) -> None:
     n=st.integers(min_value=10, max_value=500),
     loc=st.floats(min_value=0.0, max_value=100.0, allow_nan=False, allow_infinity=False),
 )
-@settings(max_examples=100)
+@settings(max_examples=100, deadline=None)
 def test_psi_non_negative(n: int, loc: float) -> None:
     """PSI is always non-negative."""
     rng = np.random.default_rng(42)

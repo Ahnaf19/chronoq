@@ -48,3 +48,17 @@ class TestSignalWiring:
         # record_completion with no registry entry should return None gracefully
         result = scheduler.record_completion("any-id", "resize", 512)
         assert result is None
+
+    def test_task_revoked_cleans_registry(self):
+        """task_revoked signal must remove the task from registry (prevents registry leak)."""
+        scheduler = LearnedScheduler(mode="shadow")
+        task_id = "test-uuid-revoked"
+        scheduler.record_start(task_id, "transcode", 1024)
+        with scheduler._lock:
+            assert task_id in scheduler._registry
+
+        # Simulate task_revoked by calling cleanup_registry directly
+        # (mirrors what on_task_revoked in signals.py does)
+        scheduler.cleanup_registry(task_id)
+        with scheduler._lock:
+            assert task_id not in scheduler._registry

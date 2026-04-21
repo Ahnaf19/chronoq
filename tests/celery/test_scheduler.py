@@ -168,3 +168,31 @@ class TestRecordCompletion:
         with patch.object(scheduler._ranker, "record") as mock_record:
             scheduler.cleanup_registry(task_id)
             mock_record.assert_not_called()
+
+
+class TestRegistryIntegrity:
+    def test_submit_duplicate_task_id_raises(self):
+        """Submitting the same task_id twice must raise ValueError, not silently corrupt."""
+        scheduler = LearnedScheduler(mode="active")
+        task_id = "unique-task-xyz"
+        scheduler.submit("resize", 512, lambda: None, task_id=task_id)
+        with __import__("pytest").raises(ValueError, match="already registered"):
+            scheduler.submit("resize", 512, lambda: None, task_id=task_id)
+
+    def test_registry_empty_after_cleanup(self):
+        """After cleanup_registry, the task_id must be absent (no leak)."""
+        scheduler = LearnedScheduler(mode="active")
+        task_id = scheduler.submit("resize", 1024, lambda: None)
+        scheduler.record_start(task_id, "resize", 1024)
+        scheduler.cleanup_registry(task_id)
+        with scheduler._lock:
+            assert task_id not in scheduler._registry
+
+    def test_registry_empty_after_record_completion(self):
+        """After record_completion, the registry entry must be removed."""
+        scheduler = LearnedScheduler(mode="shadow")
+        task_id = scheduler.submit("resize", 512, lambda: None)
+        scheduler.record_start(task_id, "resize", 512)
+        scheduler.record_completion(task_id, "resize", 512)
+        with scheduler._lock:
+            assert task_id not in scheduler._registry

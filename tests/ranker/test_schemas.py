@@ -78,3 +78,13 @@ class TestRetrainResult:
     def test_round_trip(self):
         r = RetrainResult(mae=10.0, mape=5.0, samples_used=50, model_version="v1", promoted=False)
         assert RetrainResult(**r.model_dump()) == r
+
+    def test_rejected_defaults_to_false(self):
+        r = RetrainResult(mae=0.0, mape=0.0, samples_used=10, model_version="v1", promoted=False)
+        assert r.rejected is False
+
+    def test_rejected_true_when_set(self):
+        r = RetrainResult(
+            mae=0.0, mape=0.0, samples_used=10, model_version="v1", promoted=False, rejected=True
+        )
+        assert r.rejected is True
