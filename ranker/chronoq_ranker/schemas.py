@@ -53,3 +53,50 @@ class RetrainResult(BaseModel):
     samples_used: int
     model_version: str
     promoted: bool
+
+
+class FeatureSchema(BaseModel):
+    """Versioned feature contract declaring which names/types the extractor emits.
+
+    Attached to every ``TaskRecord`` at write time via ``feature_schema_version``
+    so that retrain can validate schema equality across the training window.
+    Evolving the schema requires bumping ``version`` and writing an adapter
+    (or forcing a full refit on an all-fresh window).
+    """
+
+    version: str
+    numeric: list[str] = Field(default_factory=list)
+    categorical: list[str] = Field(default_factory=list)
+    required: list[str] = Field(default_factory=list)
+
+
+class TaskCandidate(BaseModel):
+    """A task waiting to be scored/ranked. Input to ``TaskRanker.predict_scores``.
+
+    ``features`` holds user-supplied pre-execution values (e.g. ``payload_size``,
+    ``prompt_length``, ``retry_count``, ``user_tier``). The extractor merges
+    these with wall-clock and queue-state context to produce the final feature
+    vector. Keep ``features`` small; don't stash anything derived post-execution.
+    """
+
+    task_id: str
+    task_type: str
+    features: dict = Field(default_factory=dict)
+
+
+class QueueContext(BaseModel):
+    """Queue-state snapshot passed to ``FeatureExtractor.extract``.
+
+    Zero-valued defaults let callers pass only the fields they have without
+    constructing a full context; the extractor treats missing values as the
+    no-information baseline.
+    """
+
+    queue_depth: int = 0
+    queue_depth_same_type: int = 0
+    worker_count_busy: int = 0
+    worker_count_idle: int = 0
+    recent_mean_ms_this_type: float = 0.0
+    recent_p95_ms_this_type: float = 0.0
+    recent_count_this_type: int = 0
+    time_since_last_retrain_s: float = 0.0

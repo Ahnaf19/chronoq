@@ -5,7 +5,7 @@ import threading
 from loguru import logger
 
 from chronoq_ranker.config import RankerConfig
-from chronoq_ranker.features import extract_features
+from chronoq_ranker.features import _legacy_extract_features
 from chronoq_ranker.models.gradient import GradientEstimator
 from chronoq_ranker.models.heuristic import HeuristicEstimator
 from chronoq_ranker.schemas import PredictionResult, RetrainResult, TaskRecord
@@ -41,7 +41,7 @@ class TaskRanker:
         self, task_type: str, payload_size: int, metadata: dict | None = None
     ) -> PredictionResult:
         """Predict execution time for a task."""
-        features = extract_features(task_type, payload_size, metadata)
+        features = _legacy_extract_features(task_type, payload_size, metadata)
 
         with self._lock:
             estimator = self._estimator

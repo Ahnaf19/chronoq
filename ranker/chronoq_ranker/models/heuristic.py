@@ -2,7 +2,7 @@
 
 import statistics
 
-from chronoq_ranker.models.base import BaseEstimator
+from chronoq_ranker.models.base import BaseEstimator, ModelType
 from chronoq_ranker.schemas import TaskRecord
 
 
@@ -71,5 +71,5 @@ class HeuristicEstimator(BaseEstimator):
     def version(self) -> str:
         return self._version
 
-    def model_type(self) -> str:
+    def model_type(self) -> ModelType:
         return "heuristic"
