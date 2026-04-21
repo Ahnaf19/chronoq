@@ -8,7 +8,9 @@ from chronoq_ranker.config import RankerConfig
 from chronoq_ranker.features import DefaultExtractor, FeatureExtractor, _legacy_extract_features
 from chronoq_ranker.models.gradient import GradientEstimator
 from chronoq_ranker.models.heuristic import HeuristicEstimator
+from chronoq_ranker.models.lambdarank import LambdaRankEstimator
 from chronoq_ranker.schemas import (
+    InsufficientGroupsError,
     PredictionResult,
     RetrainResult,
     ScoredTask,
@@ -39,9 +41,7 @@ class TaskRanker:
         self._estimator = HeuristicEstimator()
         self._extractor = feature_extractor or DefaultExtractor()
         self._lock = threading.Lock()
-        self._previous_model_type: str = "heuristic"
 
-        # Warm-start from existing data
         if self._store.count() > 0:
             self._warm_start()
 
@@ -54,10 +54,10 @@ class TaskRanker:
         with self._lock:
             estimator = self._estimator
 
-        estimated_ms, confidence = estimator.predict(features)
+        score, confidence = estimator.predict(features)
 
         return PredictionResult(
-            estimated_ms=estimated_ms,
+            estimated_ms=score,
             confidence=confidence,
             model_version=estimator.version(),
             model_type=estimator.model_type(),
@@ -66,13 +66,12 @@ class TaskRanker:
     def predict_scores(
         self,
         candidates: list[TaskCandidate],
-        group_id: str | None = None,  # noqa: ARG002  (used when LambdaRank lands in W3)
+        group_id: str | None = None,  # noqa: ARG002  (consumed by LambdaRank via group_id on records)
     ) -> list[ScoredTask]:
-        """Score a batch of candidates for ranking; return sorted shortest-first.
+        """Score a batch of candidates for ranking; return sorted lowest-score-first.
 
-        With the v1 heuristic/gradient estimators the score is the predicted
-        duration in ms (lower = sooner). When LambdaRank lands in Chunk 1 W3,
-        the score becomes a relative pairwise rank score within ``group_id``.
+        For heuristic/gradient models: score is estimated duration in ms (lower = sooner).
+        For LambdaRank: score is a negated pairwise rank score (lower = sooner).
         """
         if not candidates:
             return []
@@ -80,14 +79,13 @@ class TaskRanker:
         with self._lock:
             estimator = self._estimator
 
-        scored_with_cands = []
-        for cand in candidates:
-            features = self._extractor.extract(cand)
-            estimated_ms, _confidence = estimator.predict(features)
-            scored_with_cands.append((cand, estimated_ms))
+        all_features = [self._extractor.extract(cand) for cand in candidates]
+        batch_results = estimator.predict_batch(all_features)
 
-        # Ascending by score → shortest-first.
-        scored_with_cands.sort(key=lambda pair: pair[1])
+        scored = [
+            (cand, result[0]) for cand, result in zip(candidates, batch_results, strict=False)
+        ]
+        scored.sort(key=lambda pair: pair[1])
 
         return [
             ScoredTask(
@@ -97,7 +95,7 @@ class TaskRanker:
                 model_version=estimator.version(),
                 model_type=estimator.model_type(),
             )
-            for rank, (cand, score) in enumerate(scored_with_cands)
+            for rank, (cand, score) in enumerate(scored)
         ]
 
     def record(
@@ -111,14 +109,14 @@ class TaskRanker:
         with self._lock:
             current_version = self._estimator.version()
 
-        record = TaskRecord(
+        rec = TaskRecord(
             task_type=task_type,
             payload_size=payload_size,
             actual_ms=actual_ms,
             metadata=metadata or {},
             model_version_at_record=current_version,
         )
-        self._store.save(record)
+        self._store.save(rec)
 
         since_count = self._store.count_since(current_version)
         if since_count >= self._config.retrain_every_n:
@@ -130,20 +128,38 @@ class TaskRanker:
             self.retrain()
 
     def retrain(self) -> RetrainResult:
-        """Retrain the model, auto-promoting from heuristic to gradient if enough data."""
+        """Retrain the model, promoting heuristic → lambdarank when enough data."""
         records = self._store.get_all()
         total = len(records)
 
         with self._lock:
             previous_type = self._estimator.model_type()
+            current_estimator = self._estimator
 
         if total >= self._config.cold_start_threshold:
-            new_estimator = GradientEstimator()
+            if isinstance(current_estimator, LambdaRankEstimator):
+                new_estimator = current_estimator  # incremental fit on same instance
+            else:
+                new_estimator = LambdaRankEstimator(
+                    config=self._config,
+                    feature_extractor=self._extractor,
+                )
+
+            try:
+                metrics = new_estimator.fit(records)
+            except InsufficientGroupsError:
+                if self._config.allow_degrade:
+                    logger.warning(
+                        "LambdaRank fit failed (insufficient groups); "
+                        "degrading to GradientEstimator."
+                    )
+                    new_estimator = GradientEstimator()
+                    metrics = new_estimator.fit(records)
+                else:
+                    raise
         else:
             new_estimator = HeuristicEstimator()
-
-        # Fit outside lock to minimize lock duration
-        metrics = new_estimator.fit(records)
+            metrics = new_estimator.fit(records)
 
         promoted = new_estimator.model_type() != previous_type
 
@@ -151,33 +167,52 @@ class TaskRanker:
             self._estimator = new_estimator
 
         logger.info(
-            "Retrain complete: model={}, version={}, mae={:.1f}, promoted={}",
+            "Retrain complete: model={}, version={}, promoted={}",
             new_estimator.model_type(),
             new_estimator.version(),
-            metrics["mae"],
             promoted,
         )
 
         return RetrainResult(
-            mae=metrics["mae"],
-            mape=metrics["mape"],
-            samples_used=metrics["samples_used"],
+            mae=metrics.get("mae", 0.0),
+            mape=metrics.get("mape", 0.0),
+            samples_used=metrics.get("samples_used", total),
             model_version=new_estimator.version(),
             promoted=promoted,
+            model_type=new_estimator.model_type(),
+            spearman_rho=metrics.get("spearman_rho"),
+            pairwise_accuracy=metrics.get("pairwise_accuracy"),
+            kendall_tau=metrics.get("kendall_tau"),
         )
+
+    def drift_status(self) -> dict:
+        """Return current drift state (placeholder until DriftDetector wired in W3+)."""
+        return {"status": "unavailable", "reason": "drift detector not yet initialized"}
 
     def _warm_start(self) -> None:
         """Fit model from existing storage data on init."""
         records = self._store.get_all()
-        if len(records) >= self._config.cold_start_threshold:
-            estimator = GradientEstimator()
+        n = len(records)
+
+        if n >= self._config.cold_start_threshold:
+            new_estimator: HeuristicEstimator | GradientEstimator | LambdaRankEstimator
+            new_estimator = LambdaRankEstimator(
+                config=self._config,
+                feature_extractor=self._extractor,
+            )
+            try:
+                new_estimator.fit(records)
+            except InsufficientGroupsError:
+                if self._config.allow_degrade:
+                    new_estimator = GradientEstimator()
+                    new_estimator.fit(records)
+                else:
+                    raise
         else:
-            estimator = HeuristicEstimator()
-        estimator.fit(records)
+            new_estimator = HeuristicEstimator()
+            new_estimator.fit(records)
+
         with self._lock:
-            self._estimator = estimator
-        logger.info(
-            "Warm-started with {} records, model={}",
-            len(records),
-            estimator.model_type(),
-        )
+            self._estimator = new_estimator
+
+        logger.info("Warm-started with {} records, model={}", n, new_estimator.model_type())

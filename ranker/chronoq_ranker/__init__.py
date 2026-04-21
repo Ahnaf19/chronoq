@@ -3,10 +3,15 @@
 from typing import TYPE_CHECKING
 
 from chronoq_ranker.config import RankerConfig
+from chronoq_ranker.drift import DriftDetector
 from chronoq_ranker.features import DEFAULT_SCHEMA_V1, DefaultExtractor, FeatureExtractor
+from chronoq_ranker.models.lambdarank import LambdaRankEstimator
+from chronoq_ranker.models.oracle import OracleRanker
 from chronoq_ranker.ranker import TaskRanker
 from chronoq_ranker.schemas import (
+    DriftReport,
     FeatureSchema,
+    InsufficientGroupsError,
     PredictionResult,
     QueueContext,
     RetrainResult,
@@ -28,6 +33,11 @@ __all__ = [
     "FeatureExtractor",
     "DefaultExtractor",
     "DEFAULT_SCHEMA_V1",
+    "DriftDetector",
+    "DriftReport",
+    "LambdaRankEstimator",
+    "OracleRanker",
+    "InsufficientGroupsError",
     # Deprecated v1 aliases (remove in next major version):
     "TaskPredictor",
     "PredictorConfig",
@@ -40,12 +50,7 @@ if TYPE_CHECKING:
 
 
 def __getattr__(name: str):
-    """Deprecation shim for v1 top-level names.
-
-    ``from chronoq_ranker import TaskPredictor`` and
-    ``from chronoq_ranker import PredictorConfig`` keep working but emit
-    ``DeprecationWarning`` pointing at the v2 replacement.
-    """
+    """Deprecation shim for v1 top-level names."""
     import warnings
 
     aliases = {

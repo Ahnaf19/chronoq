@@ -9,6 +9,7 @@ dev-dependencies = [
     "fakeredis[lua]>=2.21",
     "httpx",
     "ruff>=0.4",
+    "hypothesis>=6.100",
 ]
 
 [tool.ruff]
@@ -24,6 +25,9 @@ quote-style = "double"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+filterwarnings = [
+    "ignore:X does not have valid feature names:UserWarning",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/bench/test_stub.py" = ["F401"]
