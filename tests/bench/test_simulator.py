@@ -9,7 +9,6 @@ from chronoq_bench.baselines.srpt_oracle import SRPTOracleScheduler
 from chronoq_bench.metrics.jct import mean_jct, p99_jct
 from chronoq_bench.simulator import Job, Simulator
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -127,12 +126,30 @@ def test_random_scheduler_completes_all_jobs() -> None:
 def test_priority_fcfs_high_priority_runs_first() -> None:
     """When two jobs are waiting, the higher-priority one must be picked first."""
     jobs = [
-        Job(job_id="runner", task_type="t", payload_size=100, true_ms=500.0,
-            arrival_ms=0.0, priority=1),
-        Job(job_id="low_waiter", task_type="t", payload_size=100, true_ms=100.0,
-            arrival_ms=1.0, priority=1),
-        Job(job_id="high_waiter", task_type="t", payload_size=100, true_ms=100.0,
-            arrival_ms=2.0, priority=9),
+        Job(
+            job_id="runner",
+            task_type="t",
+            payload_size=100,
+            true_ms=500.0,
+            arrival_ms=0.0,
+            priority=1,
+        ),
+        Job(
+            job_id="low_waiter",
+            task_type="t",
+            payload_size=100,
+            true_ms=100.0,
+            arrival_ms=1.0,
+            priority=1,
+        ),
+        Job(
+            job_id="high_waiter",
+            task_type="t",
+            payload_size=100,
+            true_ms=100.0,
+            arrival_ms=2.0,
+            priority=9,
+        ),
     ]
     result = Simulator(PriorityFCFSScheduler()).run(jobs)
     by_id = {j.job_id: j for j in result.jobs}

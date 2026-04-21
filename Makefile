@@ -6,8 +6,8 @@ help:
 	@echo "  make test         — run all tests"
 	@echo "  make lint         — ruff check + format check"
 	@echo "  make fix          — ruff check --fix + format"
-	@echo "  make bench        — run full benchmark harness (stub until Chunk 2)"
-	@echo "  make bench-smoke  — run 1k-record smoke bench (<60s, stub until Chunk 2)"
+	@echo "  make bench        — full benchmark harness (~5 min, writes bench/artifacts/)"
+	@echo "  make bench-smoke  — CI smoke bench (<60s, OFFLINE mode)"
 	@echo "  make clean        — remove caches"
 
 sync:
@@ -25,11 +25,18 @@ fix:
 	uv run ruff format .
 
 bench:
-	@echo "⚠️  make bench is a stub. Real harness lands in Chunk 2."
-	@echo "    See /Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md §4 Chunk 2."
+	@echo "==> jct_vs_load experiment"
+	uv run python -m chronoq_bench.experiments.jct_vs_load
+	@echo "==> drift_recovery experiment"
+	uv run python -m chronoq_bench.experiments.drift_recovery
+	@echo "==> ablation_features experiment"
+	uv run python -m chronoq_bench.experiments.ablation_features
+	@echo "==> artifacts written to bench/artifacts/"
 
 bench-smoke:
-	@echo "⚠️  make bench-smoke is a stub. Real harness lands in Chunk 2."
+	CHRONOQ_BENCH_SMOKE=1 CHRONOQ_BENCH_OFFLINE=1 uv run python -m chronoq_bench.experiments.jct_vs_load
+	CHRONOQ_BENCH_SMOKE=1 CHRONOQ_BENCH_OFFLINE=1 uv run python -m chronoq_bench.experiments.drift_recovery
+	CHRONOQ_BENCH_SMOKE=1 CHRONOQ_BENCH_OFFLINE=1 uv run python -m chronoq_bench.experiments.ablation_features
 
 clean:
 	find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true

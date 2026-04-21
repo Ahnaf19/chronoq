@@ -3,7 +3,6 @@
 from chronoq_bench.traces.base import TraceJob
 from chronoq_bench.traces.synthetic import SyntheticTraceLoader
 
-
 # ---------------------------------------------------------------------------
 # SyntheticTraceLoader
 # ---------------------------------------------------------------------------
@@ -106,4 +105,5 @@ def test_burstgpt_ci_sample_load_n(monkeypatch) -> None:
 
 def test_burstgpt_name() -> None:
     from chronoq_bench.traces.burstgpt import BurstGPTLoader
+
     assert BurstGPTLoader().name == "burstgpt"

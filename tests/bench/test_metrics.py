@@ -11,7 +11,6 @@ from chronoq_bench.metrics.jct import (
 )
 from chronoq_bench.metrics.ranking import pairwise_accuracy_grouped, spearman_rho
 
-
 # ---------------------------------------------------------------------------
 # JCT metrics
 # ---------------------------------------------------------------------------
@@ -72,8 +71,13 @@ def test_jains_fairness_empty() -> None:
 def test_summarise_keys() -> None:
     result = summarise([100.0, 200.0, 300.0])
     assert set(result.keys()) == {
-        "mean_jct", "p50_jct", "p95_jct", "p99_jct",
-        "hol_blocking_count", "jains_fairness", "n_jobs",
+        "mean_jct",
+        "p50_jct",
+        "p95_jct",
+        "p99_jct",
+        "hol_blocking_count",
+        "jains_fairness",
+        "n_jobs",
     }
     assert result["n_jobs"] == 3.0
 
