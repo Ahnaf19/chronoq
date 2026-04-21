@@ -14,7 +14,7 @@ Branch `v2/chunk-2-bench`.
 - Synthetic Pareto trace generator (`SyntheticTraceLoader`): 5 task types, lognormal durations with payload-size correlation, seeded Poisson arrivals
 - JCT metrics: `mean_jct`, `p99_jct`, `hol_blocking_count`, `jains_fairness_index`, `percentile_jct`, `summarise`
 - Ranking metrics: `spearman_rho`, `pairwise_accuracy_grouped`
-- 43 new tests: `test_metrics.py` (15), `test_traces.py` (9), `test_simulator.py` (12), `test_baselines.py` (7)
+- 48 new tests: `test_metrics.py` (17), `test_traces.py` (14), `test_simulator.py` (12), `test_baselines.py` (5); total suite 185
 
 **Experiments + plots (Step 5):**
 - `jct_vs_load.py`: sweeps load 0.3→0.9 (7 points), 6 schedulers; writes `jct_vs_load.png` + `results.json`
@@ -40,9 +40,9 @@ Branch `v2/chunk-2-bench`.
 | LambdaRank p99 vs SJF-oracle @ load=0.7 | **13.4% gap** | ≤ 20% ✅ |
 | LambdaRank p99 JCT vs FCFS @ load=0.5 | +11.6% | ≥ 15% ⚠️ oracle-bounded |
 | `make bench-smoke` runtime | 4.4s | < 60s ✅ |
-| Tests | 180 passing | all green ✅ |
+| Tests | 185 passing | all green ✅ |
 
-Note: p99@load=0.5 target requires BurstGPT's extreme variance (500:1 short:long). SJF-oracle (upper bound) achieves exactly +11.6% on synthetic trace. LambdaRank matches oracle — this target is not a model deficiency.
+Note: p99@load=0.5 target requires BurstGPT's extreme variance (500:1 short:long). SJF-oracle (upper bound) achieves exactly +11.6% on synthetic trace — LambdaRank p99 matches oracle exactly at load=0.5 (8306ms vs 8306ms). The ≥15% target is physically unreachable on this trace; it is not a model deficiency.
 
 **Key feature importances (ablation):** `recent_mean_ms_this_type` 80%, `payload_size` 20%.
 

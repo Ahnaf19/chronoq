@@ -56,7 +56,7 @@ Trace data lives in `bench/data/` (gitignored except `burstgpt_ci_sample.parquet
 - `CHRONOQ_BENCH_OFFLINE=1` env var → use `bench/data/burstgpt_ci_sample.parquet` (100 rows).
   CI always sets this. Full 188MB BurstGPT download only on developer machines.
 - Pandas is allowed here (trace munging). It must NOT appear in `chronoq-ranker` runtime deps.
-- `results.json` schema must include `feature_schema_version`, `n_features`, `seed`, `trace`.
+- `results.json` schema must include `feature_schema_version`, `n_features`, `seed`, `trace` (all four — any committed artifact missing these is invalid).
 - SRPT is non-preemptive ("SRPT-approx"). Documented in `docs/v2/BENCHMARKS.md`.
 
 ## Running

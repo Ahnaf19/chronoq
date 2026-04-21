@@ -93,9 +93,13 @@ The dominant signal is the type-level historical mean duration — this is `payl
 
 ### p99 at load=0.5 on synthetic trace
 
-The target of ≥15% p99 improvement at load=0.5 requires **BurstGPT's extreme variance** (500:1 short:long ratio). On the synthetic Pareto trace, SJF-oracle (the theoretical upper bound) only achieves ~11.6% p99 improvement at load=0.5. LambdaRank matches oracle exactly at this load. The ≥15% target at load=0.5 is not a model deficiency — it is physically unreachable on this trace.
+The target of ≥15% p99 improvement at load=0.5 requires **BurstGPT's extreme variance** (500:1 short:long ratio). On the synthetic Pareto trace, SJF-oracle (the theoretical upper bound) only achieves ~11.6% p99 improvement at load=0.5. LambdaRank p99 at load=0.5 equals SJF-oracle exactly (8306ms vs 8306ms) — the model is not underperforming, it is constrained by the oracle ceiling. The ≥15% target at load=0.5 is physically unreachable on this trace.
 
 **This will be revisited with BurstGPT in a future chunk.**
+
+### Training statistics at inference time
+
+The `recent_mean_ms_this_type` feature (80% of model gain) is computed from the training partition at experiment time and passed as a frozen lookup to `LambdaRankScheduler`. In the experiment, these are oracle statistics from the training data — not a rolling window from live completions. This is an accurate representation of what a production Celery integration would do: maintain a per-type rolling mean from job completions, and pass it as `QueueContext` when scoring. The Celery integration (Chunk 3) will wire this via `task_success` signals with a ring-buffer rolling mean, matching the experiment design.
 
 ### Non-preemptive SRPT
 
