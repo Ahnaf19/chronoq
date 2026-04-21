@@ -1,8 +1,14 @@
 """Abstract base class for telemetry storage backends."""
 
-from abc import ABC, abstractmethod
+from __future__ import annotations
 
-from chronoq_ranker.schemas import TaskRecord
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from chronoq_ranker.schemas import TaskRecord
 
 
 class TelemetryStore(ABC):
@@ -25,5 +31,5 @@ class TelemetryStore(ABC):
         """Total number of stored records."""
 
     @abstractmethod
-    def count_since(self, model_version: str) -> int:
-        """Count records collected under the given model version."""
+    def count_since(self, after: datetime) -> int:
+        """Count records with recorded_at > after."""

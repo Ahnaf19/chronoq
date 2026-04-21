@@ -46,6 +46,7 @@ class DriftDetector:
         self._extractor: FeatureExtractor = feature_extractor or DefaultExtractor()
         self._reference: dict[str, np.ndarray] = {}
         self._mae_window: deque[float] = deque(maxlen=_MAE_WINDOW)
+        self.last_report: DriftReport | None = None
 
     def set_reference(self, records: list[TaskRecord]) -> None:
         """Store the reference distribution from the current training batch."""
@@ -98,13 +99,15 @@ class DriftDetector:
         else:
             status = "stable"
 
-        return DriftReport(
+        report = DriftReport(
             per_feature_psi=per_feature_psi,
             overall_status=status,
             rolling_mae_delta=rolling_mae_delta,
             drifted_features=sorted(drifted),
             warned_features=sorted(warned),
         )
+        self.last_report = report
+        return report
 
 
 def _compute_psi(reference: np.ndarray, current: np.ndarray, n_bins: int = _N_BINS) -> float:

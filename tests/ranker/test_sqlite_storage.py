@@ -1,7 +1,11 @@
 """Tests for SqliteStore."""
 
+from datetime import UTC, datetime, timedelta
+
 from chronoq_ranker.schemas import TaskRecord
 from chronoq_ranker.storage.sqlite import SqliteStore
+
+_EPOCH = datetime.min.replace(tzinfo=UTC)
 
 
 def test_save_and_get_all(tmp_path):
@@ -32,15 +36,17 @@ def test_count(tmp_path):
 
 def test_count_since(tmp_path):
     store = SqliteStore(f"sqlite:///{tmp_path}/test.db")
-    store.save(
-        TaskRecord(task_type="a", payload_size=1, actual_ms=10.0, model_version_at_record="v1")
-    )
-    store.save(
-        TaskRecord(task_type="b", payload_size=2, actual_ms=20.0, model_version_at_record="v2")
-    )
-    assert store.count_since("v1") == 1
-    assert store.count_since("v2") == 1
-    assert store.count_since("v3") == 0
+    t0 = datetime.now(UTC) - timedelta(seconds=10)
+    t1 = datetime.now(UTC) - timedelta(seconds=5)
+    t2 = datetime.now(UTC)
+    store.save(TaskRecord(task_type="a", payload_size=1, actual_ms=10.0, recorded_at=t0))
+    store.save(TaskRecord(task_type="b", payload_size=2, actual_ms=20.0, recorded_at=t1))
+    store.save(TaskRecord(task_type="c", payload_size=3, actual_ms=30.0, recorded_at=t2))
+
+    assert store.count_since(_EPOCH) == 3
+    cutoff = t0 + timedelta(seconds=1)
+    assert store.count_since(cutoff) == 2
+    assert store.count_since(t2) == 0
 
 
 def test_persistence_across_instances(tmp_path):

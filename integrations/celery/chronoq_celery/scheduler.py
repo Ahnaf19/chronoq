@@ -123,6 +123,8 @@ class LearnedScheduler:
 
         # active mode — push to heap
         with self._lock:
+            if tid in self._registry:
+                raise ValueError(f"task_id already registered: {tid!r}")
             seq = self._arrival_counter
             self._arrival_counter += 1
             heapq.heappush(self._heap, (score, seq, apply_fn, tid))
@@ -180,10 +182,25 @@ class LearnedScheduler:
         self._stats.record(task_type, actual_ms)
 
         if self._ranker is not None:
+            mean, p95, count = self._stats.snapshot(task_type)
+            with self._lock:
+                queue_depth = len(self._heap)
+                same_type_depth = sum(
+                    1
+                    for _, _, _, tid in self._heap
+                    if self._registry.get(tid, {}).get("task_type") == task_type
+                )
             self._ranker.record(
                 task_type=task_type,
                 payload_size=payload_size,
                 actual_ms=actual_ms,
+                metadata={
+                    "recent_mean_ms_this_type": mean,
+                    "recent_p95_ms_this_type": p95,
+                    "recent_count_this_type": count,
+                    "queue_depth": queue_depth,
+                    "queue_depth_same_type": same_type_depth,
+                },
             )
 
         return actual_ms

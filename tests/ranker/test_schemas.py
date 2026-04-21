@@ -78,3 +78,26 @@ class TestRetrainResult:
     def test_round_trip(self):
         r = RetrainResult(mae=10.0, mape=5.0, samples_used=50, model_version="v1", promoted=False)
         assert RetrainResult(**r.model_dump()) == r
+
+    def test_rejected_defaults_to_false(self):
+        r = RetrainResult(mae=0.0, mape=0.0, samples_used=10, model_version="v1", promoted=False)
+        assert r.rejected is False
+
+    def test_rejected_true_when_set(self):
+        r = RetrainResult(
+            mae=0.0, mape=0.0, samples_used=10, model_version="v1", promoted=False, rejected=True
+        )
+        assert r.rejected is True
+
+
+def test_retrain_result_rejected_field():
+    """Plan exit-criteria gate: RetrainResult.rejected field exists and propagates correctly."""
+    r_default = RetrainResult(
+        mae=0.0, mape=0.0, samples_used=10, model_version="v1", promoted=False
+    )
+    assert r_default.rejected is False
+
+    r_rejected = RetrainResult(
+        mae=0.0, mape=0.0, samples_used=10, model_version="v1", promoted=False, rejected=True
+    )
+    assert r_rejected.rejected is True

@@ -1,14 +1,31 @@
 [project]
 name = "chronoq-celery"
-version = "0.1.0"
+version = "0.2.0"
 description = "Celery integration for chronoq-ranker — LearnedScheduler with shadow/active/fifo modes"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Ahnaf Tanjid", email = "ahnaftanjid@cloudly.io"}]
+keywords = ["scheduling", "celery", "learning-to-rank", "job-queue", "lambdarank"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "chronoq-ranker",
     "celery>=5.4",
     "redis>=5.0",
     "loguru>=0.7",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Ahnaf19/chronoq"
+Repository = "https://github.com/Ahnaf19/chronoq"
+Changelog = "https://github.com/Ahnaf19/chronoq/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

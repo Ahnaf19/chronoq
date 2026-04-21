@@ -22,10 +22,6 @@ from chronoq_ranker.models.base import BaseEstimator, ModelType
 from chronoq_ranker.schemas import InsufficientGroupsError, TaskRecord
 
 _WINDOW_SECONDS = 60
-_LEARNING_RATE = 0.05
-_N_ESTIMATORS_FULL = 500
-_NUM_LEAVES = 31
-_MIN_DATA_IN_LEAF = 20
 _RHO_REJECTION_DELTA = 0.1
 # LightGBM lambdarank labels must be in [0, label_gain length - 1].
 # Default label_gain has 31 entries (labels 0-30).  We cap at 9 (10 grades)
@@ -232,10 +228,10 @@ class LambdaRankEstimator(BaseEstimator):
 
         model = lgb.LGBMRanker(
             objective="lambdarank",
-            learning_rate=_LEARNING_RATE,
-            n_estimators=_N_ESTIMATORS_FULL,
-            num_leaves=_NUM_LEAVES,
-            min_data_in_leaf=_MIN_DATA_IN_LEAF,
+            learning_rate=self._config.learning_rate,
+            n_estimators=self._config.n_estimators,
+            num_leaves=self._config.num_leaves,
+            min_data_in_leaf=self._config.min_data_in_leaf,
             random_state=42,
             deterministic=True,
             n_jobs=-1,
@@ -293,10 +289,10 @@ class LambdaRankEstimator(BaseEstimator):
 
         model = lgb.LGBMRanker(
             objective="lambdarank",
-            learning_rate=_LEARNING_RATE,
+            learning_rate=self._config.learning_rate,
             n_estimators=self._config.incremental_rounds,
-            num_leaves=_NUM_LEAVES,
-            min_data_in_leaf=_MIN_DATA_IN_LEAF,
+            num_leaves=self._config.num_leaves,
+            min_data_in_leaf=self._config.min_data_in_leaf,
             random_state=42,
             deterministic=True,
             n_jobs=-1,

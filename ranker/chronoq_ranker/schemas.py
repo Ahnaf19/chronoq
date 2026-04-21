@@ -79,6 +79,8 @@ class RetrainResult(BaseModel):
     spearman_rho: float | None = None
     pairwise_accuracy: float | None = None
     kendall_tau: float | None = None
+    # True when a new model was trained but rejected (ρ dropped > threshold); old model kept.
+    rejected: bool = False
 
 
 class DriftReport(BaseModel):

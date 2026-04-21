@@ -1,8 +1,20 @@
 [project]
 name = "chronoq-bench"
-version = "0.1.0"
+version = "0.2.0"
 description = "Benchmark harness for chronoq-ranker: SimPy simulator, public traces, 5 baselines, metrics"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Ahnaf Tanjid", email = "ahnaftanjid@cloudly.io"}]
+keywords = ["scheduling", "benchmark", "learning-to-rank", "simulation", "lightgbm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "chronoq-ranker",
     "simpy>=4.1",
@@ -12,6 +24,11 @@ dependencies = [
     "huggingface_hub>=0.23",
     "numpy>=1.26",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Ahnaf19/chronoq"
+Repository = "https://github.com/Ahnaf19/chronoq"
+Changelog = "https://github.com/Ahnaf19/chronoq/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["hatchling"]

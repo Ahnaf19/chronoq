@@ -1,15 +1,18 @@
 """TaskRanker — orchestrates prediction, recording, and model retraining."""
 
 import threading
+from datetime import UTC, datetime
 
 from loguru import logger
 
 from chronoq_ranker.config import RankerConfig
+from chronoq_ranker.drift import DriftDetector
 from chronoq_ranker.features import DefaultExtractor, FeatureExtractor, _legacy_extract_features
 from chronoq_ranker.models.gradient import GradientEstimator
 from chronoq_ranker.models.heuristic import HeuristicEstimator
 from chronoq_ranker.models.lambdarank import LambdaRankEstimator
 from chronoq_ranker.schemas import (
+    DriftReport,
     InsufficientGroupsError,
     PredictionResult,
     RetrainResult,
@@ -18,6 +21,9 @@ from chronoq_ranker.schemas import (
     TaskRecord,
 )
 from chronoq_ranker.storage import TelemetryStore, create_store
+
+# Sentinel: count all records ever (used when no retrain has happened yet).
+_EPOCH = datetime.min.replace(tzinfo=UTC)
 
 
 class TaskRanker:
@@ -41,6 +47,9 @@ class TaskRanker:
         self._estimator = HeuristicEstimator()
         self._extractor = feature_extractor or DefaultExtractor()
         self._lock = threading.Lock()
+        # Tracks when the last successful retrain completed; count_since uses this cutoff.
+        self._last_retrain_at: datetime = _EPOCH
+        self._drift_detector = DriftDetector(self._config, self._extractor)
 
         if self._store.count() > 0:
             self._warm_start()
@@ -105,7 +114,13 @@ class TaskRanker:
         actual_ms: float,
         metadata: dict | None = None,
     ) -> None:
-        """Record actual execution time and check auto-retrain trigger."""
+        """Record actual execution time and check auto-retrain trigger.
+
+        Pass Celery queue context in ``metadata`` using the keys that DefaultExtractor
+        expects at retrain time: ``queue_depth``, ``recent_mean_ms_this_type``,
+        ``recent_p95_ms_this_type``, ``recent_count_this_type``, ``worker_count_busy``,
+        ``worker_count_idle``, ``queue_depth_same_type``.
+        """
         with self._lock:
             current_version = self._estimator.version()
 
@@ -118,12 +133,12 @@ class TaskRanker:
         )
         self._store.save(rec)
 
-        since_count = self._store.count_since(current_version)
+        since_count = self._store.count_since(self._last_retrain_at)
         if since_count >= self._config.retrain_every_n:
             logger.info(
-                "Auto-retrain triggered: {} records since version {}",
+                "Auto-retrain triggered: {} new records since last retrain at {}",
                 since_count,
-                current_version,
+                self._last_retrain_at,
             )
             self.retrain()
 
@@ -135,6 +150,17 @@ class TaskRanker:
         with self._lock:
             previous_type = self._estimator.model_type()
             current_estimator = self._estimator
+
+        # Non-blocking drift check — only runs if reference is already set.
+        try:
+            drift_report = self._drift_detector.check(records)
+            logger.info(
+                "Drift check before retrain: status={}, drifted={}",
+                drift_report.overall_status,
+                drift_report.drifted_features,
+            )
+        except RuntimeError:
+            pass  # No reference yet (first retrain); skip.
 
         if total >= self._config.cold_start_threshold:
             if isinstance(current_estimator, LambdaRankEstimator):
@@ -161,16 +187,24 @@ class TaskRanker:
             new_estimator = HeuristicEstimator()
             metrics = new_estimator.fit(records)
 
+        rejected = bool(metrics.get("_rejected", False))
         promoted = new_estimator.model_type() != previous_type
 
         with self._lock:
             self._estimator = new_estimator
 
+        self._last_retrain_at = datetime.now(UTC)
+
+        # Update drift reference after a successful lambdarank fit (not rejected).
+        if isinstance(new_estimator, LambdaRankEstimator) and not rejected:
+            self._drift_detector.set_reference(records)
+
         logger.info(
-            "Retrain complete: model={}, version={}, promoted={}",
+            "Retrain complete: model={}, version={}, promoted={}, rejected={}",
             new_estimator.model_type(),
             new_estimator.version(),
             promoted,
+            rejected,
         )
 
         return RetrainResult(
@@ -179,15 +213,16 @@ class TaskRanker:
             samples_used=metrics.get("samples_used", total),
             model_version=new_estimator.version(),
             promoted=promoted,
+            rejected=rejected,
             model_type=new_estimator.model_type(),
             spearman_rho=metrics.get("spearman_rho"),
             pairwise_accuracy=metrics.get("pairwise_accuracy"),
             kendall_tau=metrics.get("kendall_tau"),
         )
 
-    def drift_status(self) -> dict:
-        """Return current drift state (placeholder until DriftDetector wired in W3+)."""
-        return {"status": "unavailable", "reason": "drift detector not yet initialized"}
+    def drift_status(self) -> DriftReport | None:
+        """Return the most recent drift report, or None if no retrain has set a reference."""
+        return self._drift_detector.last_report
 
     def _warm_start(self) -> None:
         """Fit model from existing storage data on init."""

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from celery.signals import task_failure, task_prerun, task_success
+from celery.signals import task_failure, task_prerun, task_revoked, task_success
 
 if TYPE_CHECKING:
     from celery import Celery
@@ -43,5 +43,11 @@ def attach_signals(app: Celery, scheduler: LearnedScheduler) -> None:
 
     @task_failure.connect
     def on_task_failure(sender=None, task_id=None, **extra):
+        if task_id:
+            scheduler.cleanup_registry(task_id)
+
+    @task_revoked.connect
+    def on_task_revoked(sender=None, request=None, **extra):
+        task_id = getattr(request, "id", None) if request else None
         if task_id:
             scheduler.cleanup_registry(task_id)

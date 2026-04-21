@@ -3,11 +3,11 @@
 **Learning-to-rank scheduling for Python job queues.** Replaces FIFO with an online-learning [LambdaRank](https://en.wikipedia.org/wiki/Learning_to_rank) ranker that predicts job duration from telemetry and reorders pending work shortest-job-first. Plug it into Celery, a reference FastAPI+Redis server, or benchmark against public traces — all in one monorepo.
 
 ![CI](https://github.com/Ahnaf19/chronoq/actions/workflows/ci.yml/badge.svg)
-![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)
+![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
-![Status](https://img.shields.io/badge/status-v2%20in%20progress-yellow?style=flat-square)
+![Status](https://img.shields.io/badge/status-Chunks%200–4%20complete%20·%20PyPI--ready-brightgreen?style=flat-square)
 
-> **v2 in progress (Chunks 0–3 complete).** `chronoq-ranker` (LightGBM LambdaRank), `chronoq-bench` (SimPy simulator, 5 baselines), and `chronoq-celery` (Celery plugin, +55% mean JCT vs FIFO) are built and tested. See [`docs/v2/`](docs/v2/) for design, benchmark results, and integration guide.
+> **Chunks 0–4 complete · PyPI-ready.** `chronoq-ranker` (LightGBM LambdaRank, 15 features), `chronoq-bench` (SimPy simulator, 5 baselines, +32% mean JCT vs FCFS @ load=0.7), and `chronoq-celery` (Celery plugin, +55% mean JCT vs FIFO) are built, tested, and packaged. See [`docs/v2/`](docs/v2/) for design, benchmark results, and integration guide.
 
 ---
 
@@ -16,6 +16,10 @@
 Every Python task queue (Celery, RQ, Dramatiq, arq, Hatchet, Temporal) schedules in FIFO or static-priority order. On workloads where durations vary 2–4 orders of magnitude — ML training, LLM inference, media transcoding, document AI, data pipelines — this causes head-of-line blocking: short tasks wait behind long ones.
 
 Learned scheduling has been proven repeatedly in research (Resource Central SOSP'17 = 5% packing improvement; Decima SIGCOMM'19 = 21–50% lower JCT; vLLM-LTR NeurIPS'24 = 2.8× lower chatbot latency) but has not propagated to the Python task-queue layer. **Chronoq closes that gap** — with a LambdaRank ranker you can plug into your existing queue.
+
+![p99 JCT vs Load](bench/artifacts/jct_vs_load.png)
+
+*LambdaRank vs 5 baselines on Pareto trace. At load=0.7: **+32% mean JCT** and **+17.5% p99 JCT** vs FCFS; within 13.4% of SJF-oracle (theoretical upper bound).*
 
 ---
 
@@ -40,7 +44,7 @@ chronoq/
 | 1 — `chronoq-ranker` | ✅ complete | LightGBM LambdaRank — Spearman ρ=0.87, pairwise acc=0.89 |
 | 2 — `chronoq-bench` | ✅ complete | `make bench` — **+32% mean JCT, +17.5% p99 vs FCFS** @ load=0.7 |
 | 3 — `chronoq-celery` | ✅ complete | `LearnedScheduler` (shadow/active/fifo), +55% mean JCT vs FIFO — 216 tests |
-| 4 — Polish + promo | pending | PyPI releases, blog post, Show HN |
+| 4 — Polish + promo | ✅ complete | Bug fixes, `RankerConfig` hyperparams, drift wiring, PyPI metadata, 225 tests |
 
 Full milestone detail: [`docs/v2/README.md`](docs/v2/README.md).
 
@@ -52,7 +56,7 @@ Full milestone detail: [`docs/v2/README.md`](docs/v2/README.md).
 git clone https://github.com/Ahnaf19/chronoq.git
 cd chronoq
 uv sync
-uv run pytest -v                # 216 tests
+uv run pytest -v                # 225 tests
 ```
 
 **Run the benchmark** (Chunk 2 — produces the money plot):

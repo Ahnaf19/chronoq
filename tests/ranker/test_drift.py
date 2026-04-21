@@ -122,3 +122,47 @@ def test_drift_detector_rolling_mae_via_record_mae() -> None:
     report = detector.check(_records(list(range(100, 200))))
     # rolling MAE = mean([10.0, 10.0]) = 10.0
     assert abs(report.rolling_mae_delta - 10.0) < 1e-6
+
+
+def test_drift_status_returns_report_after_lambdarank_retrain() -> None:
+    """drift_status() must return a real DriftReport after two successful lambdarank fits.
+
+    First retrain: sets the reference distribution (last_report stays None).
+    Second retrain: runs drift check against reference → last_report is a real DriftReport.
+    """
+    from chronoq_ranker import TaskRanker
+    from chronoq_ranker.schemas import DriftReport
+    from chronoq_ranker.storage.memory import MemoryStore
+
+    config = RankerConfig(
+        cold_start_threshold=10,
+        retrain_every_n=9999,
+        min_groups=2,
+        allow_degrade=False,  # fail loud so we know LambdaRank actually ran
+        storage_uri="memory://",
+    )
+    store = MemoryStore()
+    # Seed records across 4 explicit groups so LambdaRank has enough query groups.
+    for g in range(4):
+        for i in range(5):
+            store.save(
+                TaskRecord(
+                    task_type="resize",
+                    payload_size=100 + i,
+                    actual_ms=float(50 + i * 20),
+                    group_id=f"g{g}",
+                )
+            )
+
+    ranker = TaskRanker(config=config, storage=store)
+    assert ranker.drift_status() is None  # no retrain yet
+
+    # First retrain — sets reference, last_report stays None
+    ranker.retrain()
+    assert ranker.drift_status() is None
+
+    # Second retrain — drift check runs against reference → produces a real DriftReport
+    ranker.retrain()
+    report = ranker.drift_status()
+    assert isinstance(report, DriftReport)
+    assert report.overall_status in ("stable", "warn", "drift")

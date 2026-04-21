@@ -168,3 +168,71 @@ class TestRecordCompletion:
         with patch.object(scheduler._ranker, "record") as mock_record:
             scheduler.cleanup_registry(task_id)
             mock_record.assert_not_called()
+
+
+class TestRegistryIntegrity:
+    def test_submit_duplicate_task_id_raises(self):
+        """Submitting the same task_id twice must raise ValueError, not silently corrupt."""
+        scheduler = LearnedScheduler(mode="active")
+        task_id = "unique-task-xyz"
+        scheduler.submit("resize", 512, lambda: None, task_id=task_id)
+        with __import__("pytest").raises(ValueError, match="already registered"):
+            scheduler.submit("resize", 512, lambda: None, task_id=task_id)
+
+    def test_registry_empty_after_cleanup(self):
+        """After cleanup_registry, the task_id must be absent (no leak)."""
+        scheduler = LearnedScheduler(mode="active")
+        task_id = scheduler.submit("resize", 1024, lambda: None)
+        scheduler.record_start(task_id, "resize", 1024)
+        scheduler.cleanup_registry(task_id)
+        with scheduler._lock:
+            assert task_id not in scheduler._registry
+
+    def test_registry_empty_after_record_completion(self):
+        """After record_completion, the registry entry must be removed."""
+        scheduler = LearnedScheduler(mode="shadow")
+        task_id = scheduler.submit("resize", 512, lambda: None)
+        scheduler.record_start(task_id, "resize", 512)
+        scheduler.record_completion(task_id, "resize", 512)
+        with scheduler._lock:
+            assert task_id not in scheduler._registry
+
+
+class TestFeatureContext:
+    def test_feature_context_in_training_records(self):
+        """record_completion must pass queue context metadata to ranker.record().
+
+        Verifies that the TaskRecord saved to storage contains non-zero values for
+        the context keys expected by DefaultExtractor (recent_mean_ms_this_type,
+        queue_depth, etc.) — eliminating the train-serve feature skew where 10/15
+        features were always 0.0 at training time.
+        """
+        from chronoq_ranker import TaskRanker
+        from chronoq_ranker.config import RankerConfig
+        from chronoq_ranker.storage.memory import MemoryStore
+
+        store = MemoryStore()
+        ranker = TaskRanker(config=RankerConfig(storage_uri="memory://"), storage=store)
+
+        stats = TypeStatsTracker()
+        stats.seed({"resize": 200.0})  # seed so snapshot returns non-zero mean
+
+        scheduler = LearnedScheduler(mode="shadow", ranker=ranker, stats_tracker=stats)
+
+        task_id = scheduler.submit("resize", 1024, lambda: None)
+        scheduler.record_start(task_id, "resize", 1024)
+        scheduler.record_completion(task_id, "resize", 1024)
+
+        records = store.get_all()
+        assert len(records) == 1
+        metadata = records[0].metadata
+
+        # Context keys must be present and non-zero after seeding
+        assert "recent_mean_ms_this_type" in metadata
+        assert metadata["recent_mean_ms_this_type"] > 0.0, (
+            "recent_mean_ms_this_type should be > 0 after TypeStatsTracker.seed(); "
+            "if it's 0.0 the feature skew fix is not working."
+        )
+        assert "queue_depth" in metadata
+        assert "recent_p95_ms_this_type" in metadata
+        assert "recent_count_this_type" in metadata

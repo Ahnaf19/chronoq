@@ -1,6 +1,6 @@
 # tests
 
-216 tests: 111 ranker (`tests/ranker/`) + 24 demo-server (`tests/server/`) + 49 bench (`tests/bench/`) + 32 celery (`tests/celery/`). No external services required.
+225 tests: 120 ranker (`tests/ranker/`) + 24 demo-server (`tests/server/`) + 49 bench (`tests/bench/`) + 32 celery (`tests/celery/`). No external services required.
 
 ## Layout
 
@@ -31,7 +31,7 @@ uv run pytest tests/bench/ -v             # Bench only (49)
 uv run pytest tests/celery/ -v             # Celery only (32)
 uv run pytest -k "lambdarank" -v           # LambdaRank tests only
 uv run pytest -k "hypothesis" -v          # Property tests only
-uv run pytest --cov=chronoq_ranker --cov=chronoq_demo_server
+uv run pytest --cov=chronoq_ranker --cov=chronoq_celery --cov-report=term-missing
 ```
 
 ## Adding tests
