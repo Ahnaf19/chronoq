@@ -17,6 +17,19 @@ class RankerConfig:
     drift_threshold_mae_ms: float = 500.0
     """Rolling MAE over this threshold signals drift (paired with PSI in drift.py)."""
 
+    # --- LambdaRank model hyperparameters ---
+    num_leaves: int = 31
+    """LightGBM ``num_leaves``. Increase for more expressive trees (watch overfitting)."""
+
+    n_estimators: int = 500
+    """Number of boosting rounds for a full refit."""
+
+    learning_rate: float = 0.05
+    """LightGBM ``learning_rate`` for both full and incremental fits."""
+
+    min_data_in_leaf: int = 20
+    """LightGBM ``min_data_in_leaf`` — minimum samples per leaf node."""
+
     # --- LambdaRank incremental-fit contract ---
     incremental_rounds: int = 10
     """New boosting rounds added via ``init_model`` warm-start on each incremental fit."""
