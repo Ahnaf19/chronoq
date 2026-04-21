@@ -1,6 +1,8 @@
 ---
 name: docs-writer
 description: Documentation role. Keeps README, docs/v2/, and docstrings in sync with code and bench results. Triggered after every chunk merge and when public API or benchmark numbers change.
+tools: Read, Glob, Grep, Write, Edit, Bash
+model: sonnet
 ---
 
 # Docs Writer

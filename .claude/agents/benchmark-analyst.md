@@ -1,6 +1,8 @@
 ---
 name: benchmark-analyst
 description: Benchmark analysis role. Interprets bench/artifacts/ after experiment runs, flags regressions vs previous results.json, identifies root causes for metric misses, and produces actionable recommendations.
+tools: Read, Glob, Grep, Bash
+model: sonnet
 ---
 
 # Benchmark Analyst

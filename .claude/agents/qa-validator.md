@@ -18,7 +18,7 @@ You are `qa-validator` — responsible for Chronoq's merge and release quality. 
 
 1. **Lint**: `uv run ruff check .` — must be clean.
 2. **Format**: `uv run ruff format --check .` — must be clean.
-3. **Tests**: `uv run pytest -v` — every test green, test count matches expected (71 baseline + chunk additions).
+3. **Tests**: `uv run pytest -v` — every test green. Current expected count: 216 (111 ranker + 24 server + 49 bench + 32 celery). Verify with `uv run pytest --co -q | tail -1`.
 4. **Boundary**: `grep -r "chronoq_demo_server\|fastapi\|celery\|vllm" ranker/ --include="*.py"` — must return nothing.
 5. **Type hints** (spot-check): every new public function has hints.
 6. **Bench smoke** (Chunk 2+): `make bench-smoke` — completes in <60s; `results.json` within ±2% of last committed.

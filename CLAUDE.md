@@ -2,7 +2,7 @@
 
 Learning-to-rank scheduling library for Python job queues. Replaces FIFO/static-priority ordering with online-learning LambdaRank trained on job-duration telemetry.
 
-**Phase:** Chunk 2 shipped (`chronoq-bench` — SimPy simulator, 5 baselines, 3 experiments, money plot). `make bench` produces `bench/artifacts/jct_vs_load.png`: LambdaRank +32% mean JCT and +17.5% p99 vs FCFS at load=0.7. Chunk 3 next: `chronoq-celery` integration (shadow/active/fifo modes). Full plan: `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md`. v2 docs: `docs/v2/`.
+**Phase:** Chunk 3 shipped (`chronoq-celery` — `LearnedScheduler` with shadow/active/fifo modes, +55% mean JCT vs FIFO on 200-task Pareto demo, 32 tests). Chunks 0–3 complete; Chunk 4 next (Polish + promo: PyPI releases, blog post, hero README). Full plan: `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md`. v2 docs: `docs/v2/`.
 
 ## Monorepo Layout
 

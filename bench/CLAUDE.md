@@ -3,7 +3,7 @@
 Benchmark harness for `chronoq-ranker`. Produces reproducible JCT vs load plots proving
 LambdaRank beats FIFO on real traces. Zero runtime deps on the server or Celery.
 
-**Status:** Chunk 2 in progress on `v2/chunk-2-bench`.
+**Status:** Chunk 2 complete (shipped). Branch: `v2/chunk-2-bench`.
 
 ## What this package does
 

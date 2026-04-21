@@ -1,6 +1,6 @@
 # tests
 
-216 tests: 113 ranker (`tests/ranker/`) + 24 demo-server (`tests/server/`) + 49 bench (`tests/bench/`) + 32 celery (`tests/celery/`). No external services required.
+216 tests: 111 ranker (`tests/ranker/`) + 24 demo-server (`tests/server/`) + 49 bench (`tests/bench/`) + 32 celery (`tests/celery/`). No external services required.
 
 ## Layout
 
