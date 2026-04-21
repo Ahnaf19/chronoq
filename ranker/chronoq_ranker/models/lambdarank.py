@@ -27,6 +27,10 @@ _N_ESTIMATORS_FULL = 500
 _NUM_LEAVES = 31
 _MIN_DATA_IN_LEAF = 20
 _RHO_REJECTION_DELTA = 0.1
+# LightGBM lambdarank labels must be in [0, label_gain length - 1].
+# Default label_gain has 31 entries (labels 0-30).  We cap at 9 (10 grades)
+# and normalize proportionally for large groups, matching standard LTR practice.
+_LABEL_MAX = 9
 
 # Column order mirrors DEFAULT_SCHEMA_V1; must stay in sync.
 _NUMERIC_COLS: list[str] = list(DEFAULT_SCHEMA_V1.numeric)
@@ -369,7 +373,13 @@ class LambdaRankEstimator(BaseEstimator):
             n = len(group_recs)
             for i, rec in enumerate(group_recs):
                 feature_rows.append(self._extractor.extract_from_record(rec))
-                labels.append(n - 1 - i)  # shortest → highest label
+                # Normalize to [0, _LABEL_MAX]: for small groups exact ranks are used;
+                # for large groups proportional mapping prevents exceeding label_gain limit.
+                if n <= _LABEL_MAX + 1:
+                    label = n - 1 - i
+                else:
+                    label = round((n - 1 - i) / (n - 1) * _LABEL_MAX)
+                labels.append(label)
             group_sizes.append(n)
 
         x_mat = self._build_matrix(feature_rows, fit=rebuild_encoder)
