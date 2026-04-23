@@ -487,9 +487,9 @@ def main() -> None:
         if fifo_mean > 0:
             improvement = (fifo_mean - active_mean) / fifo_mean * 100.0
             print()
-            print(f"Mean JCT improvement (active vs fifo): {improvement:+.1f}%  (target: ≥20%)")
+            print(f"Mean JCT improvement (active vs fifo): {improvement:+.1f}%  (target: >=20%)")
             if improvement >= 20.0:
-                print("EXIT CRITERION: ≥20% mean JCT improvement — PASS")
+                print("EXIT CRITERION: >=20% mean JCT improvement -- PASS")
             else:
                 print(
                     f"WARNING: improvement {improvement:.1f}% < 20% target. "
