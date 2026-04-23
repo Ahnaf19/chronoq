@@ -1,10 +1,13 @@
 """Feature ablation experiment — sensitivity scan.
 
 Uses LGBMRanker feature importance (gain) to rank all 15 features and writes
-the result to bench/artifacts/ablation_features.csv. This identifies which
-features drive ranking quality without requiring N model refits.
+the result to bench/artifacts/ablation_features.csv + ablation_features.png.
+This identifies which features drive ranking quality without requiring N model
+refits.
 
-Output: bench/artifacts/ablation_features.csv
+Outputs:
+    bench/artifacts/ablation_features.csv   — machine-readable importances
+    bench/artifacts/ablation_features.png   — horizontal bar chart (top features highlighted)
 
 Usage:
     uv run python -m chronoq_bench.experiments.ablation_features
@@ -14,6 +17,7 @@ from __future__ import annotations
 
 import csv
 import os
+from typing import TYPE_CHECKING
 
 from chronoq_ranker.features import DEFAULT_SCHEMA_V1
 
@@ -21,6 +25,9 @@ from chronoq_bench.experiments.jct_vs_load import _train_ranker
 from chronoq_bench.simulator import Job
 from chronoq_bench.traces.cache import ensure_artifacts_dir
 from chronoq_bench.traces.synthetic import SyntheticTraceLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _SEED = 42
 _N_TRAIN = 400
@@ -77,6 +84,55 @@ def run_experiment(n_train: int = _N_TRAIN, seed: int = _SEED) -> list[dict]:
     return sorted(rows, key=lambda r: r["importance_gain"], reverse=True)
 
 
+def _plot(rows: list[dict], out_path: Path) -> None:
+    """Horizontal bar chart of feature importances (highest at top).
+
+    Rows must already be sorted by ``importance_gain`` descending. The top three
+    features are drawn in the LambdaRank accent color to make the dominant
+    ranking signals visible at a glance; remaining features use a muted gray.
+    """
+    import matplotlib.pyplot as plt
+
+    from chronoq_bench.plots.base import save_figure
+
+    features = [r["feature"] for r in rows]
+    pcts = [float(r["importance_pct"]) for r in rows]
+
+    # Matplotlib plots the first entry at the bottom of a horizontal bar chart,
+    # so reverse both axes to keep the highest-importance feature at the top.
+    features_r = list(reversed(features))
+    pcts_r = list(reversed(pcts))
+
+    # Top 3 features (in the reversed list, those are the last 3) get the accent color.
+    n = len(rows)
+    top_k = min(3, n)
+    colors = ["#BDBDBD"] * (n - top_k) + ["#F44336"] * top_k
+
+    fig, ax = plt.subplots(figsize=(9, max(4.5, 0.32 * n + 1.5)))
+    bars = ax.barh(features_r, pcts_r, color=colors, edgecolor="#424242", linewidth=0.5)
+
+    for bar, pct in zip(bars, pcts_r, strict=True):
+        width = bar.get_width()
+        ax.text(
+            width + max(pcts) * 0.01,
+            bar.get_y() + bar.get_height() / 2,
+            f"{pct:.1f}%",
+            va="center",
+            fontsize=8,
+            color="#212121",
+        )
+
+    ax.set_xlabel("Importance (% of total gain)")
+    ax.set_ylabel("Feature")
+    ax.set_title("Feature Importance (LambdaRank, gain)", fontsize=12, fontweight="bold")
+    ax.grid(axis="x", alpha=0.3)
+    ax.set_xlim(0, max(pcts) * 1.15 if pcts else 1.0)
+
+    fig.tight_layout()
+    save_figure(fig, out_path)
+    print(f"Saved {out_path}")
+
+
 def main() -> None:
     smoke = os.getenv("CHRONOQ_BENCH_SMOKE") == "1"
     n_train = 150 if smoke else _N_TRAIN
@@ -95,6 +151,8 @@ def main() -> None:
     print("\nTop 5 features by gain:")
     for row in rows[:5]:
         print(f"  {row['feature']:40s}  {row['importance_pct']:6.2f}%")
+
+    _plot(rows, artifacts / "ablation_features.png")
 
 
 if __name__ == "__main__":
