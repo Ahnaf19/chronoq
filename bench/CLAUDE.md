@@ -60,6 +60,18 @@ CI fixture sample lives in `bench/fixtures/burstgpt_ci_sample.parquet` (committe
 - `results.json` schema must include `feature_schema_version`, `n_features`, `seed`, `trace` (all four — any committed artifact missing these is invalid).
 - SRPT is non-preemptive ("SRPT-approx"). Documented in `docs/v2/BENCHMARKS.md`.
 
+## Simulator conventions
+
+- `Simulator(scheduler, seed=42, n_workers=1)` — `n_workers` models parallel Celery
+  worker processes pulling from one shared queue. Implemented with
+  `simpy.Resource(capacity=n_workers)`; `n_workers=1` (the default) preserves the
+  original single-server semantics. Multi-worker simulations remain non-preemptive
+  per worker.
+- `jct_vs_concurrency.py` is the canonical multi-worker experiment: per-worker
+  `rho=0.7` fixed, concurrency swept over `{1, 2, 4, 8, 16}`; offered arrival rate
+  is scaled by `n_workers` so per-worker utilisation stays constant. Output:
+  `bench/artifacts/jct_vs_concurrency.png` + `results_concurrency.json`.
+
 ## Running
 
 ```bash
