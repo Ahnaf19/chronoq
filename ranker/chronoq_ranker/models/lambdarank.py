@@ -34,8 +34,15 @@ _CAT_COLS: list[str] = list(DEFAULT_SCHEMA_V1.categorical)
 _CAT_COL_INDICES: list[int] = list(range(len(_NUMERIC_COLS), len(_NUMERIC_COLS) + len(_CAT_COLS)))
 
 
-def _make_version() -> str:
-    return f"lambdarank-v{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+def _make_version(counter: int) -> str:
+    """Format a LambdaRank version string with a monotonic counter suffix.
+
+    On Windows, ``datetime.now()`` has ~15.6ms resolution — multiple fits inside
+    one tick would otherwise collide on the second-precision timestamp alone.
+    The ``counter`` suffix guarantees uniqueness across rapid incremental fits
+    regardless of clock precision.
+    """
+    return f"lambdarank-v{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}-{counter:04d}"
 
 
 def _assign_tumbling_group_ids(records: list[TaskRecord]) -> list[TaskRecord]:
@@ -147,6 +154,7 @@ class LambdaRankEstimator(BaseEstimator):
         self._version_str: str = ""
         self._last_rho: float = 0.0
         self._incremental_count: int = 0
+        self._version_counter: int = 0
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------
@@ -259,7 +267,8 @@ class LambdaRankEstimator(BaseEstimator):
         with self._lock:
             self._model = model
             self._last_rho = rho
-            self._version_str = _make_version()
+            self._version_counter += 1
+            self._version_str = _make_version(self._version_counter)
 
         return {
             "spearman_rho": rho,
@@ -329,7 +338,8 @@ class LambdaRankEstimator(BaseEstimator):
         with self._lock:
             self._model = model
             self._last_rho = rho
-            self._version_str = _make_version()
+            self._version_counter += 1
+            self._version_str = _make_version(self._version_counter)
 
         return {
             "spearman_rho": rho,
