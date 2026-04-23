@@ -1,0 +1,41 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: examples/celery-docker/Dockerfile
+    command: >
+      celery -A worker worker --loglevel=INFO --concurrency=4
+    environment:
+      - CHRONOQ_MODE=${CHRONOQ_MODE:-fifo}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./artifacts:/workspace/examples/celery-docker/artifacts
+
+  producer:
+    build:
+      context: ../..
+      dockerfile: examples/celery-docker/Dockerfile
+    command: python producer.py
+    environment:
+      - CHRONOQ_MODE=${CHRONOQ_MODE:-fifo}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./artifacts:/workspace/examples/celery-docker/artifacts
