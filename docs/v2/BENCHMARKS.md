@@ -1,4 +1,9 @@
-<!-- Status: current | Last-synced-to-code: v2/chunk-2-bench -->
+---
+status: current
+last-synced-to-plan: 2026-04-24
+last-synced-to-code: v2/chunk-2-bench
+source: "plan §2 Chunk 2 + track B6"
+---
 
 # Benchmarks
 
@@ -21,6 +26,7 @@ Artifacts written to `bench/artifacts/`:
 | `results.json` | Machine-readable metrics (seed, feature_schema_version, n_features) |
 | `drift_recovery.png` | p99 JCT over retrain cycles after distribution shift |
 | `ablation_features.csv` | Feature importance (gain) — 15 features ranked |
+| `ablation_features.png` | Horizontal bar chart of feature importances (top 3 highlighted) |
 
 ## Traces
 
@@ -88,6 +94,18 @@ LambdaRank p99 at load=0.7: **+17.5% vs FCFS** (target ≥15%), **within 13.4% o
 | Others | <1% each |
 
 The dominant signal is the type-level historical mean duration — this is `payload_size` (blob/artifact size) filtered through task type. Together these two features capture ~99% of ranking power on this trace.
+
+## Feature importance (ablation)
+
+![Feature Importance](../assets/ablation_features.png)
+
+The ablation experiment (`bench/chronoq_bench/experiments/ablation_features.py`) trains a LambdaRank model on the synthetic Pareto trace and reads the LightGBM `booster_.feature_importance(importance_type="gain")` for all 15 features in `DEFAULT_SCHEMA_V1`. Two features — `recent_mean_ms_this_type` (~80%) and `payload_size` (~20%) — carry ~99% of the total gain, with every other feature contributing <1%. This matches the generative model of the trace exactly (`true_ms = lognormal(mu_type + log1p(payload_kb) * 0.3, σ=0.4)`): the ranker learned the two variables that actually determine duration, confirming it is picking up real structure rather than noise. Reproduce with `uv run python -m chronoq_bench.experiments.ablation_features`.
+
+## Drift recovery
+
+![Drift Recovery](../assets/drift_recovery.png)
+
+The drift experiment (`bench/chronoq_bench/experiments/drift_recovery.py`) trains LambdaRank on a normal synthetic trace, then shifts the workload so long `transcode` jobs are 3× more frequent and measures p99 JCT across three incremental retrain cycles. The first retrain cycle recovers ~41% of the p99 gap back toward the pre-shift baseline (20,200 ms → 15,800 ms, vs a 9,600 ms baseline), proving the incremental `partial_fit`/`init_model` path ingests the new distribution and reorders accordingly. Later cycles oscillate rather than monotonically converge — a signal that the ranker responds to each retrain batch rather than averaging stale snapshots, which is the intended online-learning behavior. Reproduce with `uv run python -m chronoq_bench.experiments.drift_recovery`.
 
 ## Limitations
 
