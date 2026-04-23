@@ -1,5 +1,7 @@
 """Tests for the auto-retrain trigger fix (count_since by datetime, not version string)."""
 
+import time
+
 import pytest
 from chronoq_ranker import RankerConfig, TaskRanker
 from chronoq_ranker.storage.memory import MemoryStore
@@ -82,7 +84,12 @@ def test_count_since_resets_after_retrain(low_threshold_config):
     # Records written before the retrain should NOT be counted after the new cutoff
     assert ranker2._store.count_since(new_cutoff) == 0
 
-    # New records after the retrain should be counted
+    # New records after the retrain should be counted.
+    # Sleep past the Windows clock tick (~15.6ms from GetSystemTimeAsFileTime) so the
+    # new record's recorded_at is strictly > new_cutoff. Without this, on Windows both
+    # values fall in the same tick and count_since's strict `>` returns 0. See
+    # ranker/CLAUDE.md "Key behaviors > Auto-retrain" for the full precision caveat.
+    time.sleep(0.025)
     ranker2._store.save(
         __import__("chronoq_ranker").schemas.TaskRecord(
             task_type="t", payload_size=99, actual_ms=100.0
