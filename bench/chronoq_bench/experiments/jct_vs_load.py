@@ -1,7 +1,8 @@
 """JCT vs load experiment — the money plot.
 
 Sweeps queue load 0.3 → 0.9 across 6 schedulers (FCFS, SJF-oracle, SRPT-approx,
-random, priority+FCFS, LambdaRank) using a synthetic Pareto trace.
+random, priority+FCFS, LambdaRank) using a pluggable ``TraceLoader`` (default:
+synthetic Pareto).
 
 Outputs:
   bench/artifacts/jct_vs_load.png  — line plot, 6 schedulers × 9 load points
@@ -38,7 +39,7 @@ from chronoq_bench.traces.synthetic import SyntheticTraceLoader
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from chronoq_bench.traces.base import TraceJob
+    from chronoq_bench.traces.base import TraceJob, TraceLoader
 
 _SEED = 42
 _N_TRAIN = 800
@@ -191,18 +192,23 @@ def _make_jobs(trace_jobs: list[TraceJob], mean_true_ms: float, load: float) -> 
     ]
 
 
-def run_experiment(
-    n_train: int = _N_TRAIN,
-    n_eval: int = _N_EVAL,
-    load_points: list[float] | None = None,
-    seed: int = _SEED,
-) -> dict[str, Any]:
-    """Run the full JCT vs load sweep and return a results dict."""
-    if load_points is None:
-        load_points = _LOAD_POINTS
+def _run_one_seed(
+    loader: TraceLoader,
+    n_train: int,
+    n_eval: int,
+    load_points: list[float],
+    seed: int,
+) -> dict[str, dict[str, list[float]]]:
+    """Execute a single-seed sweep and return per-scheduler metric lists.
 
-    loader = SyntheticTraceLoader(n_jobs=n_train + n_eval, seed=seed)
-    all_trace = loader.load()
+    Shape of return: ``{sched_name: {metric: [one_value_per_load_point]}}``.
+    """
+    all_trace = loader.load(n=n_train + n_eval)
+    if len(all_trace) < n_train + n_eval:
+        raise ValueError(
+            f"Loader {type(loader).__name__} returned {len(all_trace)} jobs; "
+            f"need at least {n_train + n_eval} (n_train={n_train} + n_eval={n_eval})"
+        )
 
     training_trace = all_trace[:n_train]
     eval_trace = all_trace[n_train : n_train + n_eval]
@@ -233,7 +239,7 @@ def run_experiment(
         ),
     ]
 
-    metrics: dict[str, dict[str, list]] = {
+    metrics: dict[str, dict[str, list[float]]] = {
         sched.name: {"mean_jct": [], "p99_jct": [], "hol_count": []} for sched in schedulers
     }
 
@@ -246,9 +252,49 @@ def run_experiment(
             metrics[sched.name]["p99_jct"].append(round(p99_jct(jcts), 2))
             metrics[sched.name]["hol_count"].append(hol_blocking_count(jcts))
 
+    return metrics
+
+
+def _make_default_loader(seed: int, n_total: int) -> TraceLoader:
+    """Build the fall-back synthetic loader when caller doesn't supply one."""
+    return SyntheticTraceLoader(n_jobs=n_total, seed=seed)
+
+
+def run_experiment(
+    n_train: int = _N_TRAIN,
+    n_eval: int = _N_EVAL,
+    load_points: list[float] | None = None,
+    seed: int = _SEED,
+    loader: TraceLoader | None = None,
+) -> dict[str, Any]:
+    """Run the full JCT vs load sweep and return a results dict.
+
+    Args:
+        n_train: Number of jobs to carve off the head of the trace for training.
+        n_eval: Number of jobs (after ``n_train``) used for the simulation sweep.
+        load_points: Queue-load fractions to simulate (default 0.3 → 0.9).
+        seed: RNG seed used for training, random scheduler, and the simulator.
+        loader: Any ``TraceLoader``. When omitted, defaults to
+            ``SyntheticTraceLoader(n_jobs=n_train+n_eval, seed=seed)`` so existing
+            call sites keep working unchanged. Pass a BurstGPT/Azure/Borg loader
+            here to swap traces without copy-pasting this function.
+    """
+    if load_points is None:
+        load_points = _LOAD_POINTS
+    if loader is None:
+        loader = _make_default_loader(seed=seed, n_total=n_train + n_eval)
+
+    metrics = _run_one_seed(
+        loader=loader,
+        n_train=n_train,
+        n_eval=n_eval,
+        load_points=load_points,
+        seed=seed,
+    )
+
     schema = DEFAULT_SCHEMA_V1
     return {
-        "trace": "synthetic",
+        "trace": loader.name,
         "seed": seed,
         "feature_schema_version": schema.version,
         "n_features": len(schema.numeric) + len(schema.categorical),
