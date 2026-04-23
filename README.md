@@ -23,6 +23,24 @@ Learned scheduling has been proven repeatedly in research (Resource Central SOSP
 
 ---
 
+## Evidence
+
+The hero plot above is the headline result. Two more experiments in `bench/chronoq_bench/experiments/` make the case that LambdaRank is learning real scheduling structure, not memorizing a trace. Full methodology and reproduction commands: [`docs/v2/BENCHMARKS.md`](docs/v2/BENCHMARKS.md).
+
+### Feature importance — what the ranker actually uses
+
+![Feature Importance](docs/assets/ablation_features.png)
+
+Which features carry the ranking signal. `recent_mean_ms_this_type` and `payload_size` dominate — the model learned what the heavy-tail actually predicts duration. The remaining 13 features contribute <1% each.
+
+### Drift recovery — online learning, not a frozen snapshot
+
+![Drift Recovery](docs/assets/drift_recovery.png)
+
+When the workload shifts (long `transcode` jobs 3× more frequent), the first incremental retrain cycle recovers ~36% of the p99 gap back toward the pre-shift baseline (20,200 ms → 15,800 ms). The model is learning, not memorizing.
+
+---
+
 ## Layout
 
 ```
