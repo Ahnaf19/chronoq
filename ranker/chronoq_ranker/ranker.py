@@ -47,8 +47,16 @@ class TaskRanker:
         self._estimator = HeuristicEstimator()
         self._extractor = feature_extractor or DefaultExtractor()
         self._lock = threading.Lock()
-        # Tracks when the last successful retrain completed; count_since uses this cutoff.
+        # Tracks when the last successful retrain completed; used only for
+        # introspection and drift diagnostics now. The auto-retrain decision uses
+        # the monotonic counter below because low-resolution clocks (notably
+        # Windows' ~15.6ms GetSystemTimeAsFileTime tick) can make rapid record()
+        # calls share a timestamp with _last_retrain_at, causing strict-> based
+        # count_since to under-count and silently stall retrains.
         self._last_retrain_at: datetime = _EPOCH
+        # Monotonic in-process counter of telemetry records saved since the last
+        # successful retrain completion. Resets to 0 inside retrain().
+        self._records_since_last_retrain: int = 0
         self._drift_detector = DriftDetector(self._config, self._extractor)
 
         if self._store.count() > 0:
@@ -133,11 +141,15 @@ class TaskRanker:
         )
         self._store.save(rec)
 
-        since_count = self._store.count_since(self._last_retrain_at)
-        if since_count >= self._config.retrain_every_n:
+        # Use the in-process monotonic counter for the auto-retrain decision so
+        # that Windows' low-resolution clock cannot mask same-tick records.
+        # count_since() remains available on the store for introspection and
+        # drift tooling.
+        self._records_since_last_retrain += 1
+        if self._records_since_last_retrain >= self._config.retrain_every_n:
             logger.info(
                 "Auto-retrain triggered: {} new records since last retrain at {}",
-                since_count,
+                self._records_since_last_retrain,
                 self._last_retrain_at,
             )
             self.retrain()
@@ -194,6 +206,11 @@ class TaskRanker:
             self._estimator = new_estimator
 
         self._last_retrain_at = datetime.now(UTC)
+        # Reset the monotonic counter after a retrain attempt completes,
+        # mirroring the prior datetime-cutoff semantics: count resumes at zero
+        # from this point forward regardless of whether the model was promoted
+        # or rejected.
+        self._records_since_last_retrain = 0
 
         # Update drift reference after a successful lambdarank fit (not rejected).
         if isinstance(new_estimator, LambdaRankEstimator) and not rejected:
