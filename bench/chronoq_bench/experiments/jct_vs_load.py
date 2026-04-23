@@ -1,15 +1,17 @@
 """JCT vs load experiment — the money plot.
 
 Sweeps queue load 0.3 → 0.9 across 6 schedulers (FCFS, SJF-oracle, SRPT-approx,
-random, priority+FCFS, LambdaRank) using a synthetic Pareto trace.
+random, priority+FCFS, LambdaRank) using a pluggable ``TraceLoader`` (default:
+synthetic Pareto). Runs each load point across multiple seeds so the reader can
+see ±1σ error bands on the hero plot.
 
 Outputs:
-  bench/artifacts/jct_vs_load.png  — line plot, 6 schedulers × 9 load points
-  bench/artifacts/results.json     — machine-readable metrics + CV-bullet metadata
+  bench/artifacts/jct_vs_load.png  — median lines + ±1σ shaded bands
+  bench/artifacts/results.json     — per-seed arrays + median back-compat arrays
 
 Usage:
-    uv run python -m chronoq_bench.experiments.jct_vs_load        # full (~5 min)
-    CHRONOQ_BENCH_SMOKE=1 uv run python ...                        # CI smoke (<30s)
+    uv run python -m chronoq_bench.experiments.jct_vs_load        # full (~15 min, 10 seeds)
+    CHRONOQ_BENCH_SMOKE=1 uv run python ...                        # CI smoke (<30s, 1 seed)
 """
 
 from __future__ import annotations
@@ -38,13 +40,18 @@ from chronoq_bench.traces.synthetic import SyntheticTraceLoader
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from chronoq_bench.traces.base import TraceJob
+    from chronoq_bench.traces.base import TraceJob, TraceLoader
 
 _SEED = 42
 _N_TRAIN = 800
 _N_EVAL = 300
 _LOAD_POINTS = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 _GROUP_SIZE = 25
+_DEFAULT_SEEDS = [42, 43, 44, 45, 46, 47, 48, 49, 50, 51]
+_METRIC_KEYS = ("mean_jct", "p99_jct", "hol_count")
+# Schedulers that deserve error bands on the money plot. Other schedulers
+# render as plain lines to keep the legend readable.
+_BAND_SCHEDULERS = {"fcfs", "lambdarank"}
 
 _SCHED_COLORS = {
     "fcfs": "#888888",
@@ -191,18 +198,23 @@ def _make_jobs(trace_jobs: list[TraceJob], mean_true_ms: float, load: float) -> 
     ]
 
 
-def run_experiment(
-    n_train: int = _N_TRAIN,
-    n_eval: int = _N_EVAL,
-    load_points: list[float] | None = None,
-    seed: int = _SEED,
-) -> dict[str, Any]:
-    """Run the full JCT vs load sweep and return a results dict."""
-    if load_points is None:
-        load_points = _LOAD_POINTS
+def _run_one_seed(
+    loader: TraceLoader,
+    n_train: int,
+    n_eval: int,
+    load_points: list[float],
+    seed: int,
+) -> dict[str, dict[str, list[float]]]:
+    """Execute a single-seed sweep and return per-scheduler metric lists.
 
-    loader = SyntheticTraceLoader(n_jobs=n_train + n_eval, seed=seed)
-    all_trace = loader.load()
+    Shape of return: ``{sched_name: {metric: [one_value_per_load_point]}}``.
+    """
+    all_trace = loader.load(n=n_train + n_eval)
+    if len(all_trace) < n_train + n_eval:
+        raise ValueError(
+            f"Loader {type(loader).__name__} returned {len(all_trace)} jobs; "
+            f"need at least {n_train + n_eval} (n_train={n_train} + n_eval={n_eval})"
+        )
 
     training_trace = all_trace[:n_train]
     eval_trace = all_trace[n_train : n_train + n_eval]
@@ -233,8 +245,8 @@ def run_experiment(
         ),
     ]
 
-    metrics: dict[str, dict[str, list]] = {
-        sched.name: {"mean_jct": [], "p99_jct": [], "hol_count": []} for sched in schedulers
+    metrics: dict[str, dict[str, list[float]]] = {
+        sched.name: {metric: [] for metric in _METRIC_KEYS} for sched in schedulers
     }
 
     for load in load_points:
@@ -246,49 +258,178 @@ def run_experiment(
             metrics[sched.name]["p99_jct"].append(round(p99_jct(jcts), 2))
             metrics[sched.name]["hol_count"].append(hol_blocking_count(jcts))
 
+    return metrics
+
+
+def _make_default_loader(seed: int, n_total: int) -> TraceLoader:
+    """Build the fall-back synthetic loader when caller doesn't supply one."""
+    return SyntheticTraceLoader(n_jobs=n_total, seed=seed)
+
+
+def _stack_seeds(
+    per_seed_metrics: list[dict[str, dict[str, list[float]]]],
+    scheduler_names: list[str],
+    load_points: list[float],
+) -> dict[str, dict[str, list[list[float]]]]:
+    """Re-shape per-seed metric dicts into ``[load_idx][seed_idx]`` arrays.
+
+    Given a list of seeds where each entry is
+    ``{sched: {metric: [per_load_value, ...]}}``, produce
+    ``{sched: {metric: [[per_seed_value, ...], ...]}}`` whose outer dim is the
+    load point and inner dim is the seed — the shape expected by
+    ``plot_with_band`` and the schema agreed for ``results.json``.
+    """
+    stacked: dict[str, dict[str, list[list[float]]]] = {
+        name: {metric: [[] for _ in load_points] for metric in _METRIC_KEYS}
+        for name in scheduler_names
+    }
+    for sm in per_seed_metrics:
+        for sched in scheduler_names:
+            for metric in _METRIC_KEYS:
+                values = sm[sched][metric]
+                for load_idx, v in enumerate(values):
+                    stacked[sched][metric][load_idx].append(float(v))
+    return stacked
+
+
+def _median_flat(
+    stacked: dict[str, dict[str, list[list[float]]]],
+) -> dict[str, dict[str, list[float]]]:
+    """Collapse per-seed arrays to median-across-seeds flat arrays.
+
+    Emitted as ``*_median`` fields so downstream consumers that still assume the
+    old flat ``list[float]`` shape (e.g. older CI scrapers, ad-hoc plots) don't
+    have to reshape.
+    """
+    out: dict[str, dict[str, list[float]]] = {}
+    for sched, by_metric in stacked.items():
+        out[sched] = {}
+        for metric, per_load in by_metric.items():
+            out[sched][f"{metric}_median"] = [round(float(np.median(col)), 2) for col in per_load]
+    return out
+
+
+def run_experiment(
+    n_train: int = _N_TRAIN,
+    n_eval: int = _N_EVAL,
+    load_points: list[float] | None = None,
+    seed: int = _SEED,
+    loader: TraceLoader | None = None,
+    seeds: list[int] | None = None,
+) -> dict[str, Any]:
+    """Run the JCT vs load sweep over multiple seeds and return a results dict.
+
+    Args:
+        n_train: Number of jobs to carve off the head of the trace for training.
+        n_eval: Number of jobs (after ``n_train``) used for the simulation sweep.
+        load_points: Queue-load fractions to simulate (default 0.3 → 0.9).
+        seed: Legacy single-seed parameter. When ``seeds`` is also ``None`` the
+            sweep runs with just this seed; otherwise ``seeds`` wins. Still
+            accepted so existing callers that pass ``seed=...`` keep working.
+        loader: Any ``TraceLoader``. When omitted, a fresh synthetic loader is
+            built per seed so every seed sees independent jobs. Pass a
+            pre-built loader to share the same trace across seeds (e.g. a
+            BurstGPT parquet cache).
+        seeds: Explicit list of seeds. Defaults to 10 consecutive seeds
+            ``[42..51]`` which takes ~15 min on an 8-core laptop for the full
+            sweep.
+
+    Results shape:
+        ``schedulers[name][metric]`` is ``list[list[float]]`` with outer dim =
+        load points and inner dim = seeds. A flat ``*_median`` mirror is also
+        written for back-compat with legacy flat-array readers.
+    """
+    if load_points is None:
+        load_points = _LOAD_POINTS
+    if seeds is None:
+        seeds = [seed]
+
+    per_seed_metrics: list[dict[str, dict[str, list[float]]]] = []
+    for s in seeds:
+        trace_loader = (
+            loader if loader is not None else _make_default_loader(seed=s, n_total=n_train + n_eval)
+        )
+        metrics = _run_one_seed(
+            loader=trace_loader,
+            n_train=n_train,
+            n_eval=n_eval,
+            load_points=load_points,
+            seed=s,
+        )
+        per_seed_metrics.append(metrics)
+
+    scheduler_names = list(per_seed_metrics[0].keys())
+    stacked = _stack_seeds(per_seed_metrics, scheduler_names, load_points)
+    medians = _median_flat(stacked)
+
+    # Merge stacked arrays + median back-compat into a single per-scheduler dict
+    merged: dict[str, dict[str, list]] = {
+        name: {**stacked[name], **medians[name]} for name in scheduler_names
+    }
+
     schema = DEFAULT_SCHEMA_V1
+    # Use first seed's loader-name for reporting. When the caller shares a
+    # pre-built loader, that's its name; otherwise the synthetic factory reports
+    # "synthetic_pareto" regardless of seed.
+    reporting_loader = (
+        loader
+        if loader is not None
+        else _make_default_loader(seed=seeds[0], n_total=n_train + n_eval)
+    )
     return {
-        "trace": "synthetic",
-        "seed": seed,
+        "trace": reporting_loader.name,
+        "seed": seeds[0],  # back-compat: original "seed" field retained
+        "seeds": list(seeds),
+        "n_seeds": len(seeds),
         "feature_schema_version": schema.version,
         "n_features": len(schema.numeric) + len(schema.categorical),
         "n_training_jobs": n_train,
         "n_eval_jobs": n_eval,
         "load_points": load_points,
-        "schedulers": metrics,
+        "schedulers": merged,
     }
 
 
 def _plot(data: dict[str, Any], out_path: Path) -> None:
     import matplotlib.pyplot as plt
 
-    from chronoq_bench.plots.base import save_figure
+    from chronoq_bench.plots.base import plot_with_band, save_figure
 
     load_pts = data["load_points"]
     schedulers = data["schedulers"]
+    n_seeds = data.get("n_seeds", 1)
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     for name, m in schedulers.items():
         color = _SCHED_COLORS.get(name, "black")
         lw = 2.5 if name == "lambdarank" else 1.5
-        axes[0].plot(
-            load_pts,
-            m["mean_jct"],
-            label=_SCHED_LABELS.get(name, name),
-            color=color,
-            linewidth=lw,
-            marker="o",
-            markersize=4,
-        )
-        axes[1].plot(
-            load_pts,
-            m["p99_jct"],
-            label=_SCHED_LABELS.get(name, name),
-            color=color,
-            linewidth=lw,
-            marker="o",
-            markersize=4,
-        )
+        label = _SCHED_LABELS.get(name, name)
+
+        if name in _BAND_SCHEDULERS and n_seeds > 1:
+            plot_with_band(axes[0], load_pts, m["mean_jct"], label=label, color=color, linewidth=lw)
+            plot_with_band(axes[1], load_pts, m["p99_jct"], label=label, color=color, linewidth=lw)
+        else:
+            # Non-band schedulers — use medians to render a single line.
+            mean_line = m.get("mean_jct_median", [np.median(col) for col in m["mean_jct"]])
+            p99_line = m.get("p99_jct_median", [np.median(col) for col in m["p99_jct"]])
+            axes[0].plot(
+                load_pts,
+                mean_line,
+                label=label,
+                color=color,
+                linewidth=lw,
+                marker="o",
+                markersize=4,
+            )
+            axes[1].plot(
+                load_pts,
+                p99_line,
+                label=label,
+                color=color,
+                linewidth=lw,
+                marker="o",
+                markersize=4,
+            )
 
     for ax, ylabel in zip(axes, ["Mean JCT (ms)", "p99 JCT (ms)"], strict=True):
         ax.set_xlabel("Queue Load (ρ)")
@@ -296,8 +437,9 @@ def _plot(data: dict[str, Any], out_path: Path) -> None:
         ax.legend(fontsize=8)
         ax.grid(alpha=0.3)
 
-    axes[0].set_title("Mean JCT vs Load")
-    axes[1].set_title("p99 JCT vs Load")
+    band_note = f"n={n_seeds} seeds, ±1σ band" if n_seeds > 1 else f"n={n_seeds} seed"
+    axes[0].set_title(f"Mean JCT vs Load ({band_note})")
+    axes[1].set_title(f"p99 JCT vs Load ({band_note})")
     fig.suptitle(
         "chronoq-ranker: LambdaRank vs Baselines (Synthetic Trace)",
         fontsize=12,
@@ -309,29 +451,118 @@ def _plot(data: dict[str, Any], out_path: Path) -> None:
 
 
 def _print_criteria(data: dict[str, Any]) -> None:
+    """Report median-across-seeds gates and fail loud on any per-seed violation.
+
+    The median number is the headline for the README. The per-seed check is a
+    reproducibility guardrail: a single seed that violates the gate is a red
+    flag worth investigating (usually high-variance at that load).
+    """
     load_pts = data["load_points"]
     s = data["schedulers"]
+    seeds = data.get("seeds", [data.get("seed")])
 
-    def _val(sched: str, metric: str, load: float) -> float:
+    def _median(sched: str, metric: str, load: float) -> float:
         if load not in load_pts:
             return float("nan")
-        return s[sched][metric][load_pts.index(load)]
+        key = f"{metric}_median"
+        if key in s[sched]:
+            return float(s[sched][key][load_pts.index(load)])
+        # Fallback: compute on the fly (useful in unit tests)
+        col = s[sched][metric][load_pts.index(load)]
+        return float(np.median(col))
+
+    def _per_seed(sched: str, metric: str, load: float) -> list[float]:
+        if load not in load_pts:
+            return []
+        col = s[sched][metric][load_pts.index(load)]
+        return list(col) if isinstance(col, list) else [float(col)]
 
     def _imp(base: float, cand: float) -> float:
         return (base - cand) / base * 100 if base > 0 else float("nan")
 
+    def _check(
+        label: str,
+        base_sched: str,
+        cand_sched: str,
+        metric: str,
+        load: float,
+        *,
+        target_pct: float,
+        direction: str = "ge",
+    ) -> None:
+        base_med = _median(base_sched, metric, load)
+        cand_med = _median(cand_sched, metric, load)
+        median_pct = _imp(base_med, cand_med)
+        print(
+            f"  {label}: median {median_pct:+.1f}%  (target "
+            f"{'≥' if direction == 'ge' else '≤'}{'+' if target_pct > 0 else ''}{target_pct:.0f}%)"
+        )
+
+        # Per-seed: compute improvement seed-by-seed
+        bases = _per_seed(base_sched, metric, load)
+        cands = _per_seed(cand_sched, metric, load)
+        violations: list[str] = []
+        for seed_idx, (b, c) in enumerate(zip(bases, cands, strict=True)):
+            pct = _imp(b, c)
+            ok = pct >= target_pct if direction == "ge" else pct <= target_pct
+            if not ok:
+                seed_val = seeds[seed_idx] if seed_idx < len(seeds) else seed_idx
+                violations.append(f"seed={seed_val} ({pct:+.1f}%)")
+        if violations:
+            print(f"    ! per-seed gate violations: {', '.join(violations)}")
+
+    def _check_ratio(
+        label: str, num_sched: str, denom_sched: str, metric: str, load: float, *, target_pct: float
+    ) -> None:
+        num = _median(num_sched, metric, load)
+        den = _median(denom_sched, metric, load)
+        gap = abs(num - den) / den * 100 if den > 0 else float("nan")
+        print(f"  {label}: median {gap:.1f}%  (target ≤{target_pct:.0f}%)")
+        nums = _per_seed(num_sched, metric, load)
+        dens = _per_seed(denom_sched, metric, load)
+        violations: list[str] = []
+        for seed_idx, (n, d) in enumerate(zip(nums, dens, strict=True)):
+            g = abs(n - d) / d * 100 if d > 0 else float("nan")
+            if g > target_pct:
+                seed_val = seeds[seed_idx] if seed_idx < len(seeds) else seed_idx
+                violations.append(f"seed={seed_val} ({g:.1f}%)")
+        if violations:
+            print(f"    ! per-seed gate violations: {', '.join(violations)}")
+
     print("\n=== Exit Criteria ===")
-    m07 = _imp(_val("fcfs", "mean_jct", 0.7), _val("lambdarank", "mean_jct", 0.7))
-    p99_07 = _imp(_val("fcfs", "p99_jct", 0.7), _val("lambdarank", "p99_jct", 0.7))
-    sjf_p99 = _val("sjf_oracle", "p99_jct", 0.7)
-    vs_sjf = abs(_val("lambdarank", "p99_jct", 0.7) - sjf_p99)
-    vs_sjf_pct = vs_sjf / sjf_p99 * 100 if sjf_p99 > 0 else float("nan")
-    print(f"  mean JCT vs FCFS @ 0.7: {m07:+.1f}%  (target ≥+10%)")
-    print(f"  p99  JCT vs FCFS @ 0.7: {p99_07:+.1f}%  (target ≥+15%)")
-    print(f"  p99 gap vs SJF-oracle @ 0.7: {vs_sjf_pct:.1f}%  (target ≤20%)")
+    _check(
+        "mean JCT vs FCFS @ 0.7",
+        "fcfs",
+        "lambdarank",
+        "mean_jct",
+        0.7,
+        target_pct=10.0,
+    )
+    _check(
+        "p99  JCT vs FCFS @ 0.7",
+        "fcfs",
+        "lambdarank",
+        "p99_jct",
+        0.7,
+        target_pct=15.0,
+    )
+    _check_ratio(
+        "p99 gap vs SJF-oracle @ 0.7",
+        "lambdarank",
+        "sjf_oracle",
+        "p99_jct",
+        0.7,
+        target_pct=20.0,
+    )
     if 0.5 in load_pts:
-        p99_05 = _imp(_val("fcfs", "p99_jct", 0.5), _val("lambdarank", "p99_jct", 0.5))
-        print(f"  p99  JCT vs FCFS @ 0.5: {p99_05:+.1f}%  (target ≥+15%)")
+        _check(
+            "p99  JCT vs FCFS @ 0.5",
+            "fcfs",
+            "lambdarank",
+            "p99_jct",
+            0.5,
+            target_pct=15.0,
+        )
 
 
 def main() -> None:
@@ -339,9 +570,18 @@ def main() -> None:
     n_train = 200 if smoke else _N_TRAIN
     n_eval = 100 if smoke else _N_EVAL
     load_pts = [0.5, 0.7] if smoke else _LOAD_POINTS
+    seeds = [_SEED] if smoke else _DEFAULT_SEEDS
 
-    print(f"jct_vs_load: n_train={n_train}, n_eval={n_eval}, load_points={load_pts}")
-    data = run_experiment(n_train=n_train, n_eval=n_eval, load_points=load_pts)
+    print(
+        f"jct_vs_load: n_train={n_train}, n_eval={n_eval}, "
+        f"load_points={load_pts}, n_seeds={len(seeds)}"
+    )
+    data = run_experiment(
+        n_train=n_train,
+        n_eval=n_eval,
+        load_points=load_pts,
+        seeds=seeds,
+    )
 
     artifacts = ensure_artifacts_dir()
     results_path = artifacts / "results.json"
