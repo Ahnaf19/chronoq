@@ -69,7 +69,7 @@ Headline: **Spearman ρ**, **Kendall τ**, **pairwise accuracy** on held-out gro
 ## Key behaviors
 
 - **Warm start**: init fits from existing storage if `count > 0`.
-- **Auto-retrain**: triggered when `store.count_since(_last_retrain_at) >= config.retrain_every_n`. Uses datetime-based counting (`after: datetime`) — NOT version-string matching. `_last_retrain_at` advances after each successful retrain so the counter resets correctly.
+- **Auto-retrain**: triggered when `_records_since_last_retrain >= config.retrain_every_n`. Uses an in-process monotonic counter on `TaskRanker` rather than `store.count_since(_last_retrain_at)`, because Windows `datetime.now()` has ~15.6ms resolution (`GetSystemTimeAsFileTime`) — rapid `record()` calls after a retrain can share `recorded_at` with `_last_retrain_at` and be missed by the strict-`>` comparison. The counter increments on every `record()` and resets after every `retrain()` attempt (promoted or not). `_last_retrain_at` is still stamped for logging and drift diagnostics. The `TelemetryStore.count_since` method is preserved for introspection but is no longer load-bearing for the retrain decision.
 - **Heuristic fallback**: retained for cold start and unseen `task_type`s.
 - **Drift detection**: `drift_status()` returns `DriftReport | None`. After a successful lambdarank full fit, `DriftDetector.set_reference()` is called; subsequent retrains check drift (non-blocking — logged, not gate-blocking).
 
