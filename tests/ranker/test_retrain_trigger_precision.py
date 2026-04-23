@@ -74,8 +74,7 @@ def test_auto_retrain_fires_when_clock_is_frozen(
 
     first_count = len(retrain_calls)
     assert first_count >= 1, (
-        "Auto-retrain must fire at least once after crossing the threshold, "
-        f"got {first_count}."
+        f"Auto-retrain must fire at least once after crossing the threshold, got {first_count}."
     )
 
     # Second batch — under a frozen clock, all ``recorded_at`` == ``_last_retrain_at``.
