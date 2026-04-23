@@ -173,3 +173,87 @@ def test_scheduler_names() -> None:
 def test_sim_result_scheduler_name() -> None:
     result = Simulator(FCFSScheduler()).run(_make_jobs(5))
     assert result.scheduler_name == "fcfs"
+
+
+# ---------------------------------------------------------------------------
+# Multi-worker (n_workers) — Celery concurrency model
+# ---------------------------------------------------------------------------
+
+
+class _CountingScheduler(FCFSScheduler):
+    """FCFS that counts how many times ``select()`` is called."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def select(self, waiting: list[Job]) -> Job:
+        self.calls += 1
+        return super().select(waiting)
+
+
+def test_n_workers_default_1_back_compat() -> None:
+    """No-kwarg constructor is single-worker; serialized execution holds."""
+    # 5 identical 100ms jobs arriving at t=0 → single server runs them back-to-back.
+    jobs = [
+        Job(job_id=f"j{i}", task_type="t", payload_size=100, true_ms=100.0, arrival_ms=0.0)
+        for i in range(5)
+    ]
+    sim = Simulator(FCFSScheduler())  # no n_workers kwarg
+    assert sim.n_workers == 1
+    result = sim.run(jobs)
+    assert len(result.jobs) == 5
+    # With one worker, total wall time ≈ 5 × 100ms = 500ms.
+    assert max(j.end_ms for j in result.jobs) == pytest.approx(500.0, rel=0.01)
+    # And jobs must have run strictly sequentially (no overlaps).
+    by_start = sorted(result.jobs, key=lambda j: j.start_ms)
+    for prev, nxt in zip(by_start, by_start[1:], strict=False):
+        assert nxt.start_ms >= prev.end_ms - 1e-9
+
+
+def test_n_workers_2_concurrent_execution() -> None:
+    """Two simultaneously-arriving jobs run in parallel on 2 workers."""
+    jobs = [
+        Job(job_id="a", task_type="t", payload_size=100, true_ms=50.0, arrival_ms=0.0),
+        Job(job_id="b", task_type="t", payload_size=100, true_ms=50.0, arrival_ms=0.0),
+    ]
+    result = Simulator(FCFSScheduler(), n_workers=2).run(jobs)
+    by_id = {j.job_id: j for j in result.jobs}
+    # Both jobs start at ~t=0 (within a small delta, not serialized one-after-other).
+    assert abs(by_id["a"].start_ms - by_id["b"].start_ms) < 1e-6
+    # And they overlap: the second-to-start's start_ms < first-to-finish's end_ms.
+    starts = sorted(j.start_ms for j in result.jobs)
+    ends = sorted(j.end_ms for j in result.jobs)
+    assert starts[1] < ends[0]
+
+
+def test_n_workers_8_throughput() -> None:
+    """16 identical 100ms jobs on 8 workers → wall time ≈ 2× single job duration."""
+    dur = 100.0
+    jobs = [
+        Job(job_id=f"j{i}", task_type="t", payload_size=100, true_ms=dur, arrival_ms=0.0)
+        for i in range(16)
+    ]
+    result = Simulator(FCFSScheduler(), n_workers=8).run(jobs)
+    assert len(result.jobs) == 16
+    total_wall_ms = max(j.end_ms for j in result.jobs)
+    # Tight bound: exactly 2 batches of 8 → 2×dur.
+    assert total_wall_ms == pytest.approx(2 * dur, rel=0.02)
+    # And it is dramatically less than the 16×dur single-worker upper bound.
+    assert total_wall_ms < 16 * dur / 4
+
+
+def test_n_workers_invalid_raises() -> None:
+    """n_workers must be a positive integer."""
+    with pytest.raises(ValueError, match="n_workers"):
+        Simulator(FCFSScheduler(), n_workers=0)
+    with pytest.raises(ValueError, match="n_workers"):
+        Simulator(FCFSScheduler(), n_workers=-1)
+
+
+def test_scheduler_select_called_per_slot() -> None:
+    """``select()`` is called exactly once per job, regardless of n_workers."""
+    jobs = _make_jobs(n=12, true_ms=10.0, arrival_gap_ms=1.0)
+    sched = _CountingScheduler()
+    result = Simulator(sched, n_workers=4).run(jobs)
+    assert len(result.jobs) == 12
+    assert sched.calls == 12
