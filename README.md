@@ -37,7 +37,7 @@ Which features carry the ranking signal. `recent_mean_ms_this_type` and `payload
 
 ![Drift Recovery](docs/assets/drift_recovery.png)
 
-When the workload shifts (long `transcode` jobs 3× more frequent), the first incremental retrain cycle recovers ~36% of the p99 gap back toward the pre-shift baseline (20,200 ms → 15,800 ms). The model is learning, not memorizing.
+When the workload shifts (long `transcode` jobs 3× more frequent), the first incremental retrain cycle recovers ~41% of the p99 gap back toward the pre-shift baseline (20,200 ms → 15,800 ms). The model is learning, not memorizing.
 
 ---
 

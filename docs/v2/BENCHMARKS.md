@@ -105,7 +105,7 @@ The ablation experiment (`bench/chronoq_bench/experiments/ablation_features.py`)
 
 ![Drift Recovery](../assets/drift_recovery.png)
 
-The drift experiment (`bench/chronoq_bench/experiments/drift_recovery.py`) trains LambdaRank on a normal synthetic trace, then shifts the workload so long `transcode` jobs are 3× more frequent and measures p99 JCT across three incremental retrain cycles. The first retrain cycle recovers ~36% of the p99 gap back toward the pre-shift baseline (20,200 ms → 15,800 ms, vs a 9,600 ms baseline), proving the incremental `partial_fit`/`init_model` path ingests the new distribution and reorders accordingly. Later cycles oscillate rather than monotonically converge — a signal that the ranker responds to each retrain batch rather than averaging stale snapshots, which is the intended online-learning behavior. Reproduce with `uv run python -m chronoq_bench.experiments.drift_recovery`.
+The drift experiment (`bench/chronoq_bench/experiments/drift_recovery.py`) trains LambdaRank on a normal synthetic trace, then shifts the workload so long `transcode` jobs are 3× more frequent and measures p99 JCT across three incremental retrain cycles. The first retrain cycle recovers ~41% of the p99 gap back toward the pre-shift baseline (20,200 ms → 15,800 ms, vs a 9,600 ms baseline), proving the incremental `partial_fit`/`init_model` path ingests the new distribution and reorders accordingly. Later cycles oscillate rather than monotonically converge — a signal that the ranker responds to each retrain batch rather than averaging stale snapshots, which is the intended online-learning behavior. Reproduce with `uv run python -m chronoq_bench.experiments.drift_recovery`.
 
 ## Limitations
 
