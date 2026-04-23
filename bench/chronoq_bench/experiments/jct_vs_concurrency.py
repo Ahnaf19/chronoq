@@ -201,9 +201,11 @@ def _print_criteria(data: dict[str, Any]) -> None:
     def _imp(base: float, cand: float) -> float:
         return (base - cand) / base * 100 if base > 0 else float("nan")
 
-    print("\n=== Concurrency Sweep (per-worker rho=%s) ===" % data["load_per_worker"])
-    print(f"  {'workers':>8}  {'FCFS mean':>10}  {'LR mean':>10}  "
-          f"{'d% mean':>8}  {'FCFS p99':>10}  {'LR p99':>10}  {'d% p99':>8}")
+    print(f"\n=== Concurrency Sweep (per-worker rho={data['load_per_worker']}) ===")
+    print(
+        f"  {'workers':>8}  {'FCFS mean':>10}  {'LR mean':>10}  "
+        f"{'d% mean':>8}  {'FCFS p99':>10}  {'LR p99':>10}  {'d% p99':>8}"
+    )
     for i, n in enumerate(cs):
         fm = s["fcfs"]["mean_jct"][i]
         lm = s["lambdarank"]["mean_jct"][i]
