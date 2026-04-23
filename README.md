@@ -17,7 +17,7 @@ Every Python task queue (Celery, RQ, Dramatiq, arq, Hatchet, Temporal) schedules
 
 Learned scheduling has been proven repeatedly in research (Resource Central SOSP'17 = 5% packing improvement; Decima SIGCOMM'19 = 21–50% lower JCT; vLLM-LTR NeurIPS'24 = 2.8× lower chatbot latency) but has not propagated to the Python task-queue layer. **Chronoq closes that gap** — with a LambdaRank ranker you can plug into your existing queue.
 
-![p99 JCT vs Load](bench/artifacts/jct_vs_load.png)
+![p99 JCT vs Load](docs/assets/jct_vs_load.png)
 
 *LambdaRank vs 5 baselines on Pareto trace. At load=0.7: **+32% mean JCT** and **+17.5% p99 JCT** vs FCFS; within 13.4% of SJF-oracle (theoretical upper bound).*
 

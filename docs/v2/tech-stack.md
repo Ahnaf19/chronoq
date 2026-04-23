@@ -1,7 +1,7 @@
 ---
 status: current
 last-synced-to-plan: 2026-04-21
-source: `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md` §5–§6
+source: "plan §5–§6"
 ---
 
 # Tech stack — Chronoq v2

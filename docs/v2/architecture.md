@@ -2,7 +2,7 @@
 status: current
 last-synced-to-plan: 2026-04-21
 last-shipped-chunk: 1-W2
-source: `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md` §3
+source: "plan §3"
 ---
 
 # Architecture — Chronoq v2
