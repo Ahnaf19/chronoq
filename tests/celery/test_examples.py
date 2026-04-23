@@ -25,9 +25,7 @@ def test_toggle_demo_runs() -> None:
         capture_output=True,
         text=True,
         timeout=60,
-        cwd=str(
-            __import__("pathlib").Path(__file__).parent.parent.parent
-        ),
+        cwd=str(__import__("pathlib").Path(__file__).parent.parent.parent),
     )
     elapsed = time.monotonic() - start
 
