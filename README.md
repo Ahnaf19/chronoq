@@ -1,102 +1,96 @@
 # Chronoq
 
-**Learning-to-rank scheduling for Python job queues.** Replaces FIFO with an online-learning [LambdaRank](https://en.wikipedia.org/wiki/Learning_to_rank) ranker that predicts job duration from telemetry and reorders pending work shortest-job-first. Plug it into Celery, a reference FastAPI+Redis server, or benchmark against public traces — all in one monorepo.
+> Learning-to-rank scheduling for Python task queues. Replace FIFO with an
+> online LambdaRank. 2-line Celery drop-in.
 
 ![CI](https://github.com/Ahnaf19/chronoq/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
-![Status](https://img.shields.io/badge/status-Wave%201%20merged%20·%20Wave%202%20pending-blue?style=flat-square)
 
-> **Chunks 0–4 complete · v0.2.0 sprint Wave 1 merged.** `chronoq-ranker` (LightGBM LambdaRank, 15 features), `chronoq-bench` (SimPy simulator, 5 baselines, multi-seed + multi-worker experiments), and `chronoq-celery` (Celery plugin, eager demo + Docker A/B stack) are built, tested, and packaged. 244 tests. Wave 2 (real-trace loaders: BurstGPT, Azure, Borg) is next. See [`docs/v2/`](docs/v2/) for design, benchmark results, and integration guide.
+![hero](docs/assets/jct_vs_load.png)
 
----
-
-## Why Chronoq
-
-Every Python task queue (Celery, RQ, Dramatiq, arq, Hatchet, Temporal) schedules in FIFO or static-priority order. On workloads where durations vary 2–4 orders of magnitude — ML training, LLM inference, media transcoding, document AI, data pipelines — this causes head-of-line blocking: short tasks wait behind long ones.
-
-Learned scheduling has been proven repeatedly in research (Resource Central SOSP'17 = 5% packing improvement; Decima SIGCOMM'19 = 21–50% lower JCT; vLLM-LTR NeurIPS'24 = 2.8× lower chatbot latency) but has not propagated to the Python task-queue layer. **Chronoq closes that gap** — with a LambdaRank ranker you can plug into your existing queue.
-
-![p99 JCT vs Load](docs/assets/jct_vs_load.png)
-
-*LambdaRank vs 5 baselines on Pareto trace. At load=0.7: **+32% mean JCT** and **+17.5% p99 JCT** vs FCFS; within 13.4% of SJF-oracle (theoretical upper bound).*
+**+32% mean JCT · +17.5% p99** vs FCFS on synthetic Pareto · **within 5.1%** of
+SJF-oracle on real BurstGPT traces · byte-identical reproducibility across
+macOS + Windows.
 
 ---
 
-## Evidence
+## Install & try (30 seconds)
 
-The hero plot above is the headline result. Two more experiments in `bench/chronoq_bench/experiments/` make the case that LambdaRank is learning real scheduling structure, not memorizing a trace. Full methodology and reproduction commands: [`docs/v2/BENCHMARKS.md`](docs/v2/BENCHMARKS.md).
-
-### Feature importance — what the ranker actually uses
-
-![Feature Importance](docs/assets/ablation_features.png)
-
-Which features carry the ranking signal. `recent_mean_ms_this_type` and `payload_size` dominate — the model learned what the heavy-tail actually predicts duration. The remaining 13 features contribute <1% each.
-
-### Drift recovery — online learning, not a frozen snapshot
-
-![Drift Recovery](docs/assets/drift_recovery.png)
-
-When the workload shifts (long `transcode` jobs 3× more frequent), the first incremental retrain cycle recovers ~41% of the p99 gap back toward the pre-shift baseline (20,200 ms → 15,800 ms). The model is learning, not memorizing.
-
----
-
-## Layout
-
-```
-chronoq/
-├── ranker/                   # chronoq-ranker — ML library (CPU LightGBM LambdaRank)
-├── bench/                    # chronoq-bench — SimPy simulator + 5 baselines + public traces
-├── integrations/celery/      # chronoq-celery — Celery plugin (shadow/active/fifo modes)
-├── demo-server/              # reference FastAPI+Redis integration (v1, demoted)
-└── docs/                     # docs/v1/ (archived), docs/v2/ (current)
+```bash
+pip install chronoq-celery
 ```
 
+```python
+from chronoq_celery import LearnedScheduler, attach_signals
+from celery import Celery
+
+app = Celery("myapp", broker="redis://localhost:6379/0")
+scheduler = LearnedScheduler(mode="active")  # or "shadow" / "fifo"
+attach_signals(app, scheduler)
+```
+
+Already running production Celery? Flip `mode="shadow"` — the ranker scores tasks
+without changing any dispatch behavior, so you can measure the potential win
+first, then flip to `"active"`.
+
 ---
 
-## Status
+## Why this exists
 
-| Chunk | Status | Deliverable |
+Python task queues — Celery, RQ, Dramatiq, Hatchet, Temporal — all ship FIFO or
+static priority. On heavy-tail workloads (LLM inference, media transcoding, ML
+training), a 20ms `resize` waits behind a 1.8s `transcode` with no good reason.
+
+Ten-plus years of systems research says learning-to-rank beats FIFO here:
+- Microsoft **Resource Central** (SOSP'17): +5% VM packing from lifetime prediction
+- MIT **Decima** (SIGCOMM'19): −21 to −50% JCT on Spark via RL-learned scheduling
+- UCSD **vLLM-LTR** (NeurIPS'24): 2.8× lower LLM chatbot latency from ranker-based scheduling
+
+None of this has shipped to the Python task-queue layer. Chronoq closes that gap.
+
+---
+
+## Evidence — validated on 4 real workload traces
+
+| Trace | Source | Headline |
 |---|---|---|
-| 0 — Scaffold + team + docs | ✅ complete | workspace, `.claude/` team, docs restructure — 73 tests |
-| 1 — `chronoq-ranker` | ✅ complete | LightGBM LambdaRank — Spearman ρ=0.87, pairwise acc=0.89 |
-| 2 — `chronoq-bench` | ✅ complete | `make bench` — **+32% mean JCT, +17.5% p99 vs FCFS** @ load=0.7 |
-| 3 — `chronoq-celery` | ✅ complete | `LearnedScheduler` (shadow/active/fifo), +55% mean JCT vs FIFO — 216 tests |
-| 4 — Polish + promo | ✅ complete | Bug fixes, `RankerConfig` hyperparams, drift wiring, PyPI metadata, 225 tests |
-| v0.2.0 Wave 1 | ✅ merged | Multi-seed bench, multi-worker sim, ablation plots, eager + Docker demos, Windows hotfixes — **244 tests** |
-| v0.2.0 Wave 2 | ⏳ pending | Real-trace loaders (BurstGPT, Azure Functions, Google Borg) |
+| Synthetic Pareto (seeded) | Generated | **+32% mean / +17.5% p99** vs FCFS at ρ=0.7 |
+| BurstGPT (LLM inference) | HuggingFace `lzzmm/BurstGPT` | **Within 5.1% of SJF-oracle** at p99 |
+| Google Borg 2011 (cluster batch) | GCS `gs://clusterdata-2011-2` | **+14–22% mean JCT** at ρ ≥ 0.8 |
+| Azure Functions 2019 (serverless) | `Azure/AzurePublicDataset` | **+10% mean JCT** (p99 structurally bound on this workload) |
 
-Full milestone detail: [`docs/v2/README.md`](docs/v2/README.md).
+![Feature importance](docs/assets/ablation_features.png)
+![Drift recovery](docs/assets/drift_recovery.png)
+
+All results reproducible with one command (`make bench`). Byte-identical
+`results.json` across macOS and Windows (SHA-256 verified). Full methodology +
+per-trace tables in [`docs/v2/BENCHMARKS.md`](docs/v2/BENCHMARKS.md).
 
 ---
 
-## Quick Start
+## What's in the box
 
-```bash
-git clone https://github.com/Ahnaf19/chronoq.git
-cd chronoq
-uv sync
-uv run pytest -v                # 244 tests
-```
+- **`chronoq-ranker`** — LightGBM LambdaRank over 15 features, online incremental
+  retraining, drift detection. Standalone ML library; zero deps on Celery / Redis /
+  FastAPI.
+- **`chronoq-celery`** — pre-broker gate with `fifo` / `shadow` / `active` modes.
+  Shadow mode logs scores without changing behavior — measure before switching.
+- **`chronoq-bench`** — SimPy simulator, 5 baselines (incl. SJF oracle + SRPT
+  approximation), 4 real-trace loaders, reproducible `make bench`.
 
-**Run the benchmark** (Chunk 2 — produces the money plot):
+---
 
-```bash
-make bench          # ~5 min, writes bench/artifacts/jct_vs_load.png + results.json
-make bench-smoke    # <60s CI subset (uses bundled 100-row sample)
-```
-
-The money plot (`bench/artifacts/jct_vs_load.png`) shows LambdaRank vs 5 baselines across
-load ρ=0.3–0.9. At load=0.7: **+32% mean JCT improvement** and **+17.5% p99 improvement**
-over FCFS, within 13.4% of SJF-oracle (the theoretical upper bound).
-
-**Use the ranker library** (Chunk 1):
+## Usage — standalone ranker
 
 ```python
 from chronoq_ranker import TaskRanker, TaskCandidate
 
 ranker = TaskRanker(storage="sqlite:///jobs.db")
 ranker.record(task_type="resize", payload_size=2048, actual_ms=312.4)
+ranker.record(task_type="transcode", payload_size=8000, actual_ms=1780.1)
+# ... more telemetry over time triggers retraining ...
+
 scored = ranker.predict_scores([
     TaskCandidate(task_id="j1", task_type="transcode", payload_size=8000),
     TaskCandidate(task_id="j2", task_type="resize",    payload_size=500),
@@ -104,50 +98,40 @@ scored = ranker.predict_scores([
 # scored[0] is the job LambdaRank predicts finishes fastest
 ```
 
-**Use the Celery integration** (Chunk 3 — +55% mean JCT improvement):
+---
 
-```python
-from chronoq_celery import LearnedScheduler, attach_signals
-from celery import Celery
+## Honest limitations
 
-app = Celery("myapp", broker="redis://localhost:6379/0")
-scheduler = LearnedScheduler(mode="active")  # or "shadow" (log-only) or "fifo"
-attach_signals(app, scheduler)
-
-# Submit tasks through the scheduler instead of apply_async directly
-scheduler.submit("resize", 1024, lambda: my_task.apply_async(...))
-```
-
-Run the demo:
-
-```bash
-make celery-demo     # prints fifo vs active JCT table — no Docker required
-```
-
-Full quickstart: [`docs/v2/INTEGRATIONS.md`](docs/v2/INTEGRATIONS.md).
-
-**v1 reference server** (demo-server, still works):
-
-```bash
-docker compose up                # Redis + FastAPI
-curl -X POST http://localhost:8000/tasks -H 'content-type: application/json' \
-  -d '{"task_type":"resize","payload_size":1024}'
-```
+- **p99 starvation at saturation** (ρ ≥ 0.8): SJF-family tradeoff — short-first
+  bias indefinitely delays long jobs at the tail. Pair with aging in production.
+  An aging-aware scheduler is planned for v0.3.0.
+- **Workload-dependent wins**: on traces where SJF-oracle can't improve p99
+  (narrow duration variance, single task type), the ranker also can't. The bench
+  harness is a diagnostic tool for this — see the Azure Functions result.
+- **Pre-1.0 API**: breaking changes allowed in minor-version bumps under the
+  project's semver policy; deprecation shims land one minor ahead.
 
 ---
 
-## Documentation
+## Deeper reading
 
-| Audience | Start here |
-|---|---|
-| **Trying Chronoq** | [`docs/v2/README.md`](docs/v2/README.md) — landing + chunk status |
-| **Celery quickstart** | [`docs/v2/INTEGRATIONS.md`](docs/v2/INTEGRATIONS.md) — install, modes, seeding, training |
-| **Contributing** | [`docs/v2/architecture.md`](docs/v2/architecture.md) — system design |
-| **Stack details** | [`docs/v2/tech-stack.md`](docs/v2/tech-stack.md) — dependencies, versions, rationale |
-| **Historical (v1)** | [`docs/v1/`](docs/v1/) — FastAPI+Redis architecture (still in `demo-server/`) |
+- [`docs/v2/architecture.md`](docs/v2/architecture.md) — system design, component map
+- [`docs/v2/BENCHMARKS.md`](docs/v2/BENCHMARKS.md) — full methodology, all numbers, honest framing
+- [`docs/v2/INTEGRATIONS.md`](docs/v2/INTEGRATIONS.md) — Celery quickstart, shadow→active rollout guide
+- [`integrations/celery/examples/`](integrations/celery/examples/) — runnable eager-mode + Docker demos
+
+---
+
+## Status & roadmap
+
+- **v0.2.0** (shipping): 4 real-trace validation · multi-seed error bands · multi-worker simulator · Celery integration with eager + Docker demos · byte-identical cross-platform reproducibility
+- **v0.2.1** (next patch): 3 more traces — Philly DL-training · Helios multi-tenant GPU · Mooncake cross-provider LLM (Kimi FAST'25)
+- **v0.3.0** (next minor): SRPT+aging scheduler (bounded p99 starvation) · more cluster / microservice / HPC traces · possible Hatchet or Temporal integration
+
+See [`CHANGELOG.md`](CHANGELOG.md) for full release history.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. Contributions welcome — issues for bug reports, PRs with tests for changes.
