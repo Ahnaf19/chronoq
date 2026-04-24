@@ -2,7 +2,7 @@
 
 Standalone ML library for task duration prediction. **Zero deps on server, Redis, FastAPI, Celery, vLLM.** Verify: `grep -r "chronoq_demo_server\|fastapi\|celery" .` returns nothing.
 
-**Status:** Chunk 1 W3 complete. W1 renamed `TaskPredictor` → `TaskRanker`; W2 added `FeatureSchema` + `DefaultExtractor` (15 features) + `predict_scores()` batch API; W3 added `LambdaRankEstimator` (LightGBM `LGBMRanker`), `OracleRanker`, `drift.py` (`DriftDetector` + PSI), wired LambdaRank promotion/degrade into `TaskRanker.retrain()`, and 52 new tests (lambdarank, oracle, drift, hypothesis). 137 tests passing.
+**Status:** LambdaRank pipeline complete. `TaskRanker` orchestrates heuristic cold-start → `LambdaRankEstimator` (LightGBM `LGBMRanker`) promotion, incremental warm-start, `DriftDetector` (PSI), `OracleRanker` for bench upper bounds. 15-feature `DefaultExtractor`. `RankerConfig` exposes all LightGBM hyperparams. All v0.2.0 Windows precision fixes applied.
 
 ## Ownership
 
@@ -23,17 +23,17 @@ chronoq_ranker/
 ├── models/
 │   ├── base.py       # BaseEstimator ABC + ModelType Literal
 │   ├── heuristic.py  # Per-type mean/std — cold-start
-│   ├── gradient.py   # sklearn GBR — retained as legacy; superseded by lambdarank.py (Chunk 1 W3)
-│   ├── lambdarank.py # W3 — LightGBM LGBMRanker (lambdarank objective)
-│   └── oracle.py     # W3 — SJF/SRPT using true actual_ms (benchmarks only)
+│   ├── gradient.py   # sklearn GBR — retained as legacy; superseded by lambdarank.py
+│   ├── lambdarank.py # LightGBM LGBMRanker (lambdarank objective)
+│   └── oracle.py     # SJF/SRPT using true actual_ms (benchmarks only)
 ├── storage/
 │   ├── base.py       # TelemetryStore ABC
 │   ├── memory.py     # MemoryStore — testing
 │   └── sqlite.py     # SqliteStore — thread-safe, JSON metadata
-└── drift.py          # NEW Chunk 1 — PSI + rolling MAE + DriftReport
+└── drift.py          # PSI + rolling MAE + DriftReport
 ```
 
-## Chunk 1 — LambdaRank specifics
+## LambdaRank specifics
 
 **Objective.** `LGBMRanker(objective="lambdarank")` with hyperparams from `RankerConfig`: `learning_rate=0.05`, `n_estimators=500`, `num_leaves=31`, `min_data_in_leaf=20` (all configurable). CPU-only, pairwise with NDCG gain.
 
@@ -54,7 +54,7 @@ class FeatureSchema(BaseModel):
 ```
 Attached to every `TaskRecord`. Retrain validates schema version match per record window.
 
-**`DefaultExtractor` ships 15 features** (plan §3.3): `task_type`, `payload_size`, `hour_of_day`, `day_of_week`, `queue_depth`, `queue_depth_same_type`, `recent_mean_ms_this_type`, `recent_p95_ms_this_type`, `recent_count_this_type`, `time_since_last_retrain_s`, `worker_count_busy`, `worker_count_idle`, `prompt_length` (nullable), `user_tier` (cat, nullable), `retry_count`.
+**`DefaultExtractor` ships 15 features**: `task_type`, `payload_size`, `hour_of_day`, `day_of_week`, `queue_depth`, `queue_depth_same_type`, `recent_mean_ms_this_type`, `recent_p95_ms_this_type`, `recent_count_this_type`, `time_since_last_retrain_s`, `worker_count_busy`, `worker_count_idle`, `prompt_length` (nullable), `user_tier` (cat, nullable), `retry_count`.
 
 **No label leakage.** Features must be computable *before* the task runs. `actual_ms` is label-only.
 
@@ -77,7 +77,7 @@ Headline: **Spearman ρ**, **Kendall τ**, **pairwise accuracy** on held-out gro
 ## Testing
 
 ```bash
-uv run pytest tests/ranker/ -v              # 111 tests (47 original + 4 compat + 8 predict_scores + 23 lambdarank + 8 oracle + 11 drift + 8 hypothesis + 2 features)
+uv run pytest tests/ranker/ -v
 ```
 
 Uses `memory://` storage and low thresholds (`cold_start_threshold=10`, `retrain_every_n=20`) via `conftest.py`. Hypothesis property tests in `test_lambdarank_hypothesis.py`: rank-label monotonicity, ρ range [-1,1], pairwise accuracy range [0,1], PSI non-negative.

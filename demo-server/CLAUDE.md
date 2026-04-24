@@ -8,7 +8,7 @@
 chronoq_demo_server/
 ├── main.py             # FastAPI lifespan + router mounting
 ├── config.py           # ServerConfig — env var overrides
-├── task_registry.py    # simulate_task() — random sleep stub (scrapped in Chunk 2 for real trace replay)
+├── task_registry.py    # simulate_task() — random sleep stub (real trace replay is in chronoq-bench)
 ├── core/
 │   ├── queue.py        # TaskQueue — Redis sorted set (ZADD/ZPOPMIN)
 │   ├── scheduler.py    # Scheduler — bridges ranker ↔ queue
@@ -47,7 +47,7 @@ Worker loop: ZPOPMIN → simulate_task() → scheduler.report_completion() → r
 ## Testing
 
 ```bash
-uv run pytest tests/server/ -v              # 24 tests
+uv run pytest tests/server/ -v
 ```
 
 Integration tests mock `simulate_task` to `asyncio.sleep(0.01)` for speed.
@@ -55,5 +55,5 @@ Integration tests mock `simulate_task` to `asyncio.sleep(0.01)` for speed.
 ## When modifying
 
 - Treat as frozen unless the change demonstrates ranker integration.
-- Real ranker integration work belongs in `integrations/celery/` (Chunk 3).
-- Bench / simulator work belongs in `bench/` (Chunk 2).
+- Real ranker integration work belongs in `integrations/celery/`.
+- Bench / simulator work belongs in `bench/`.

@@ -5,8 +5,7 @@ last-synced-to-plan: 2026-04-22
 
 # Chronoq Integrations
 
-How to wire `chronoq-ranker` into your job queue. Currently supported: **Celery**.
-Planned: Hatchet sidecar (Chunk 4, optional), vLLM plugin (deferred until GPU budget).
+How to wire `chronoq-ranker` into your job queue. Currently supported: **Celery**. Planned: Hatchet sidecar (optional, post-v0.2.0), vLLM plugin (deferred until GPU budget).
 
 ## Celery — `chronoq-celery`
 
@@ -54,8 +53,7 @@ task_id = scheduler.submit(
 )
 ```
 
-That's it. In `active` mode, tasks are held in an in-process heap scored by predicted
-duration and dispatched in score order as workers free up.
+That's it. In `active` mode, tasks are held in an in-process heap scored by predicted duration and dispatched in score order as workers free up.
 
 ---
 
@@ -73,9 +71,7 @@ Switch modes at runtime by changing `scheduler.mode` — or create separate sche
 
 ### Architecture
 
-Celery uses Redis LISTS (`LPUSH`/`BLPOP`) — there is no broker-level "select next task"
-hook. `LearnedScheduler` is a **pre-broker gate**: your code calls `submit()` instead of
-calling Celery's `apply_async()` directly. In `active` mode:
+Celery uses Redis LISTS (`LPUSH`/`BLPOP`) — there is no broker-level "select next task" hook. `LearnedScheduler` is a **pre-broker gate**: your code calls `submit()` instead of calling Celery's `apply_async()` directly. In `active` mode:
 
 ```
 submit(task_type, payload_size, apply_fn, task_id)
@@ -88,19 +84,15 @@ submit(task_type, payload_size, apply_fn, task_id)
                                  dispatch_next() ──► pop heap → apply_fn()
 ```
 
-`dispatch_next()` is called automatically from the `task_success` signal — no manual
-bookkeeping needed after `attach_signals()`.
+`dispatch_next()` is called automatically from the `task_success` signal — no manual bookkeeping needed after `attach_signals()`.
 
 ---
 
 ### TypeStatsTracker — live rolling statistics
 
-The scheduler uses a `TypeStatsTracker` to compute `recent_mean_ms_this_type` at scoring
-time. This feature carries ~80% of the LambdaRank model's ranking signal (from Chunk 2
-ablation). The tracker updates automatically as tasks complete.
+The scheduler uses a `TypeStatsTracker` to compute `recent_mean_ms_this_type` at scoring time. This feature carries ~80% of the LambdaRank model's ranking signal (from the ablation experiment — see `docs/v2/BENCHMARKS.md`). The tracker updates automatically as tasks complete.
 
-**Cold start:** on first deploy, the tracker has no observations. Seed it from historical
-data to avoid cold-start ranking:
+**Cold start:** on first deploy, the tracker has no observations. Seed it from historical data to avoid cold-start ranking:
 
 ```python
 from chronoq_celery import TypeStatsTracker
@@ -118,8 +110,7 @@ scheduler = LearnedScheduler(mode="active", stats_tracker=stats)
 
 ### Training the ranker
 
-`LearnedScheduler` ships with a cold-start heuristic that doesn't require training.
-For full LambdaRank ranking (the model that gives +32% mean JCT over FCFS):
+`LearnedScheduler` ships with a cold-start heuristic that doesn't require training. For full LambdaRank ranking (the model that gives +32% mean JCT over FCFS):
 
 ```python
 from chronoq_ranker import TaskRanker
@@ -165,32 +156,25 @@ P99  JCT improvement: +1.6%
 EXIT CRITERION: mean JCT improvement ≥15% — PASS
 ```
 
-The mean JCT improvement is consistently ≥15% on Pareto-distributed workloads (5 task types,
-57ms–3220ms mean durations, σ=0.6). P99 improvement is low because p99 corresponds to the
-longest tasks — in sequential execution, long tasks finish last regardless of ordering.
+The mean JCT improvement is consistently ≥15% on Pareto-distributed workloads (5 task types, 57ms–3220ms mean durations, σ=0.6). P99 improvement is low because p99 corresponds to the longest tasks — in sequential execution, long tasks finish last regardless of ordering.
 
 ---
 
 ### Limitations and scope
 
 - **Single-process gate only.** Multiple Celery workers calling `submit()` on different
-  scheduler instances won't share the heap. For multi-process deployments, you need a
-  shared priority queue (e.g., Redis sorted set) — not yet implemented.
+  scheduler instances won't share the heap. For multi-process deployments, you need a shared priority queue (e.g., Redis sorted set) — not yet implemented.
 - **No broker-level integration.** Tasks already in Celery's broker queue are not re-ranked.
   `LearnedScheduler` only controls tasks submitted through it.
 - **Eager mode (testing).** `task_always_eager=True` runs tasks synchronously. Signals still
-  fire, but the signal chain may recurse in active mode. For unit tests, test ordering logic
-  via mocked `_score()` (see `tests/celery/test_scheduler.py`).
+  fire, but the signal chain may recurse in active mode. For unit tests, test ordering logic via mocked `_score()` (see `tests/celery/test_scheduler.py`).
 
 ---
 
-## Hatchet (planned, Chunk 4)
+## Hatchet (planned)
 
-Hatchet uses static priority 1–5. A sidecar pattern can inject Chronoq scores as priority
-values before task submission. Planned for Chunk 4 if time permits.
+Hatchet uses static priority 1–5. A sidecar pattern can inject Chronoq scores as priority values before task submission. Planned for v0.3.0 if time permits.
 
 ## vLLM (deferred)
 
-vLLM v0.11+ has a pluggable scheduler API. A `chronoq-vllm` plugin is planned but deferred
-until GPU budget is available. See [`hao-ai-lab/vllm-ltr`](https://github.com/hao-ai-lab/vllm-ltr)
-for the prior art this will build on.
+vLLM v0.11+ has a pluggable scheduler API. A `chronoq-vllm` plugin is planned but deferred until GPU budget is available. See [`hao-ai-lab/vllm-ltr`](https://github.com/hao-ai-lab/vllm-ltr) for the prior art this will build on.

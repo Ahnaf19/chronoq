@@ -2,18 +2,18 @@
 
 Learning-to-rank scheduling library for Python job queues. Replaces FIFO/static-priority ordering with online-learning LambdaRank trained on job-duration telemetry.
 
-**Phase:** Chunks 0–4 complete. Chunk 4 shipped: bug fixes (count_since datetime, feature skew, registry integrity, task_revoked wiring), `RankerConfig` hyperparams, DriftDetector wired, PyPI metadata, Python 3.10/3.12 CI, 225 tests. Full plan: `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md`. v2 docs: `docs/v2/`.
+**Phase:** v0.2.0 pre-publish sprint on `main`. Chunks 0-4 shipped historically; v0.2.0 sprint added multi-seed bench, multi-worker simulator, ablation + drift plots, Celery eager + Docker demos, Windows cross-platform fixes, docs sync, and 3 real-trace loaders (BurstGPT, Google Borg 2011, Azure Functions 2019). Semver-only external versioning per `docs/v2/internal/versioning.md`. Active sprint plan: `~/.claude/plans/eager-puzzling-cherny.md`.
 
 ## Monorepo Layout
 
 ```
 chronoq/
-├── ranker/                    # chronoq-ranker — ML library (v1 regressor, becomes LTR in Chunk 1)
-├── bench/                     # chronoq-bench — simulator + traces + baselines (Chunk 2)
-├── integrations/celery/       # chronoq-celery — Celery plugin (Chunk 3)
+├── ranker/                    # chronoq-ranker — LambdaRank ML library
+├── bench/                     # chronoq-bench — SimPy simulator + traces + baselines
+├── integrations/celery/       # chronoq-celery — Celery integration (LearnedScheduler)
 ├── demo-server/               # reference FastAPI+Redis integration (v1 demoted)
 ├── tests/                     # tests/{ranker,bench,celery,demo_server}/
-├── docs/                      # Chunk 0 W3: split into docs/v1/ and docs/v2/
+├── docs/                      # docs/v1/ (archived), docs/v2/ (current)
 └── .claude/                   # agents, commands, settings — see §Claude Team
 ```
 
@@ -28,11 +28,11 @@ chronoq/
 ## Tech Stack
 
 - Python 3.11, `uv` workspace
-- **Ranker** (Chunk 1+): Pydantic v2, LightGBM `LGBMRanker` (lambdarank objective), loguru, sqlite3 stdlib. No pandas in runtime.
-- **Bench** (Chunk 2+): SimPy, matplotlib, pyarrow, huggingface_hub, pandas.
-- **Celery integration** (Chunk 3+): Celery 5.4+, redis-py.
+- **Ranker**: Pydantic v2, LightGBM `LGBMRanker` (lambdarank objective), loguru, sqlite3 stdlib. No pandas in runtime.
+- **Bench**: SimPy, matplotlib, pyarrow, huggingface_hub, pandas.
+- **Celery integration**: Celery 5.4+, redis-py.
 - **Demo-server** (kept for reference): FastAPI, uvicorn, redis-py async.
-- **Testing**: pytest + pytest-asyncio (auto mode), fakeredis[lua], hypothesis (Chunk 1+).
+- **Testing**: pytest + pytest-asyncio (auto mode), fakeredis[lua], hypothesis.
 - **Lint**: ruff — line-length 100, target-version py311, double quotes.
 - **CI**: GitHub Actions — lint + test on push/PR.
 
@@ -71,7 +71,7 @@ uv run pytest -v               # All tests
 uv run ruff check .            # Lint
 uv run ruff check . --fix      # Lint + auto-fix
 uv run ruff format .           # Format
-make bench                     # (Chunk 2+) full benchmark harness
+make bench                     # full benchmark harness
 make test / make lint / make fix
 ```
 
@@ -85,15 +85,15 @@ make test / make lint / make fix
 | `/boundary-check` | Verify ranker has zero server/framework imports |
 | `/sync-docs` | Doc/code sync check |
 | `/coverage` | Coverage report |
-| `/chunk-review [0-4]` | (v2) Verify current chunk's exit criteria |
-| `/prd-check` | (v2) WIP vs PRD functional requirements |
-| `/status` | (v2) Current chunk, progress, latest bench |
-| `/claude-audit` | (v2) Audit `.claude/` + all CLAUDE.md for staleness |
-| `/architecture-check` | (Chunk 1+) Public API drift check |
-| `/ml-review` | (Chunk 1+) Ranker code review by ml-engineer |
-| `/bench`, `/bench-smoke` | (Chunk 2+) Run benchmarks |
-| `/integration-test` | (Chunk 3+) Integration smoke test |
-| `/release [pkg]` | (Chunk 4) Release notes + QA gate + `uv publish` |
+| `/chunk-review [0-4]` | Verify chunk exit criteria (legacy framework; see `docs/v2/internal/versioning.md` for the semver-era release-gate runbook) |
+| `/prd-check` | WIP vs PRD functional requirements |
+| `/status` | Current sprint progress, latest bench |
+| `/claude-audit` | Audit `.claude/` + all CLAUDE.md for staleness |
+| `/architecture-check` | Public API drift check |
+| `/ml-review` | Ranker code review by ml-engineer |
+| `/bench`, `/bench-smoke` | Run benchmarks |
+| `/integration-test` | Integration smoke test (shipping in v0.2.0) |
+| `/release [pkg]` | Release notes + QA gate + `uv publish` (shipping in v0.2.0) |
 
 ## Claude Team
 
@@ -103,11 +103,11 @@ Treat Claude as a fractional team. Role subagents live in `.claude/agents/`:
 - `product-manager` — BRD/PRD, feature prioritization, release notes.
 - `project-manager` — CHANGELOG, milestone tracking, chunk reviews, PR descriptions.
 - `library-architect` — public API, interface contracts, schema versioning.
-- `ml-engineer` (Chunk 1+) — ranker, features, LightGBM, drift.
-- `senior-backend-dev` (Chunk 3+) — Celery, demo-server, async.
-- `benchmark-analyst` (Chunk 2+) — bench interpretation, regression bisection.
+- `ml-engineer` — ranker, features, LightGBM, drift.
+- `senior-backend-dev` — Celery, demo-server, async.
+- `benchmark-analyst` — bench interpretation, regression bisection.
 - `qa-validator` — runs full validation gate pre-merge.
-- `docs-writer` (Chunk 2+) — README + `docs/` sync.
+- `docs-writer` — README + `docs/` sync.
 
 **Rules:**
 - Any change to public API in `ranker/chronoq_ranker/{ranker,schemas,config,features}.py` → invoke `library-architect` via `/architecture-check` FIRST.
@@ -117,7 +117,7 @@ Treat Claude as a fractional team. Role subagents live in `.claude/agents/`:
 - LTR pipeline doubt (features, labels, drift) → invoke `ml-engineer`, don't guess.
 - Benchmark regression >5% on any metric in `results.json` → blocks merge until explained.
 
-Full roster + invocation triggers + ownership: plan `/Users/ahnaftanjid/.claude/plans/ok-i-want-golden-knuth.md` §12 (moved to `docs/v2/claude-team.md` in Weekend 3).
+Full roster + invocation triggers + ownership: plan `~/.claude/plans/ok-i-want-golden-knuth.md` §12. An OSS extract at `docs/v2/claude-team.md` was scoped but not shipped; the plan file remains canonical.
 
 ## Key Files
 
@@ -125,10 +125,10 @@ Full roster + invocation triggers + ownership: plan `/Users/ahnaftanjid/.claude/
 - Schemas: `ranker/chronoq_ranker/schemas.py` (`TaskRecord`, `TaskCandidate`, `ScoredTask`, `FeatureSchema`, `QueueContext`, `PredictionResult`, `RetrainResult`).
 - Config: `ranker/chronoq_ranker/config.py` (`RankerConfig`; `PredictorConfig` is a silent alias).
 - Features: `ranker/chronoq_ranker/features.py` (`FeatureExtractor` ABC, `DefaultExtractor`, `DEFAULT_SCHEMA_V1`).
-- Models: `ranker/chronoq_ranker/models/{heuristic,gradient}.py` today; adds `lambdarank.py`, `oracle.py` in Chunk 1 W3.
+- Models: `ranker/chronoq_ranker/models/{heuristic,gradient,lambdarank,oracle}.py`.
 - Storage: `ranker/chronoq_ranker/storage/{sqlite,memory}.py`.
 - Shared test fixtures: `tests/conftest.py`.
-- Per-package CLAUDE.md exists under `ranker/`, `demo-server/`, `tests/`, `docs/` (and later `bench/`, `integrations/celery/`).
+- Per-package CLAUDE.md exists under `ranker/`, `demo-server/`, `tests/`, `docs/`, `bench/`, `integrations/celery/`.
 
 ## Subagents
 

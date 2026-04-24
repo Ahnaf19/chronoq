@@ -1,14 +1,13 @@
 ---
 status: current
 last-synced-to-plan: 2026-04-24
-last-synced-to-code: "v0.2.0-dev @ 27f1611 (Wave 2 B2 BurstGPT fixes)"
-source: "plan §2 Chunk 2 + sprint tracks B1/B2/B5/B6"
+last-synced-to-code: "v0.2.0-dev @ 27f1611"
+source: "plan §2 + v0.2.0 sprint"
 ---
 
 # Benchmarks
 
-End-to-end evidence that LambdaRank scheduling outperforms FIFO on realistic workloads.
-Reproduce with one command on any 8-core laptop in under 10 minutes.
+End-to-end evidence that LambdaRank scheduling outperforms FIFO on realistic workloads. Reproduce with one command on any 8-core laptop in under 10 minutes.
 
 ## Reproduce
 
@@ -32,45 +31,30 @@ Artifacts written to `bench/artifacts/`:
 
 ### Synthetic Pareto (default)
 
-Generated at runtime — no download required, CI-safe. Pareto-shaped duration distribution
-via 5 task types (`resize` 57ms mean → `transcode` 3220ms mean), each lognormal with payload-
-size-correlated duration: `true_ms = lognormal(mu_type + log1p(payload_kb)*0.3, σ=0.4)`.
+Generated at runtime — no download required, CI-safe. Pareto-shaped duration distribution via 5 task types (`resize` 57ms mean → `transcode` 3220ms mean), each lognormal with payloadsize-correlated duration: `true_ms = lognormal(mu_type + log1p(payload_kb)*0.3, σ=0.4)`.
 
 Arrivals follow a Poisson process; load ρ is controlled by scaling inter-arrival times.
 
 **Why this trace**: Known heavy-tail structure guarantees LambdaRank has signal to exploit.
 
-**Cross-platform reproducibility**: validated on macOS (Apple Silicon, Python 3.11) and
-Windows (Ryzen 5 3600, Python 3.11.13). At the same `main` commit, `bench/artifacts/results.json`
-is **byte-identical** across platforms after LF line-ending normalization —
-SHA-256: `e101be378784e75b48b01e2818011f22c03828e2eb3c83cd0a48da80858119b6`. Every
-per-seed metric and every median aggregate matches. Any future divergence from these
-medians is a reproducibility regression worth bisecting.
+**Cross-platform reproducibility**: validated on macOS (Apple Silicon, Python 3.11) and Windows (Ryzen 5 3600, Python 3.11.13). At the same `main` commit, `bench/artifacts/results.json` is **byte-identical** across platforms after LF line-ending normalization — SHA-256: `e101be378784e75b48b01e2818011f22c03828e2eb3c83cd0a48da80858119b6`. Every per-seed metric and every median aggregate matches. Any future divergence from these medians is a reproducibility regression worth bisecting.
 
 ### BurstGPT
 
-LLM inference request trace (~1.4M requests) from the `lzzmm/BurstGPT` HuggingFace
-dataset (`data/BurstGPT_1.csv`, downloaded April 2026). Size: 50 MB CSV → 30 MB parquet
-cached at `bench/data/burstgpt_full.parquet`.
+LLM inference request trace (~1.4M requests) from the `lzzmm/BurstGPT` HuggingFace dataset (`data/BurstGPT_1.csv`, downloaded April 2026). Size: 50 MB CSV → 30 MB parquet cached at `bench/data/burstgpt_full.parquet`.
 
-**Dataset columns (current schema, April 2026)**:
-`Timestamp`, `Model`, `Request tokens`, `Response tokens`, `Total tokens`, `Log Type`.
-There is **no measured end-to-end latency** in this public dataset.
+**Dataset columns (current schema, April 2026)**: `Timestamp`, `Model`, `Request tokens`, `Response tokens`, `Total tokens`, `Log Type`. There is **no measured end-to-end latency** in this public dataset.
 
-**Duration synthesis**: `duration_ms` is derived from `output_length` (Response tokens)
-via a seeded lognormal model:
+**Duration synthesis**: `duration_ms` is derived from `output_length` (Response tokens) via a seeded lognormal model:
 
 ```
 duration_ms = max(1.0, exp(log(30 + 0.9 * output_length) + 0.35 * N(0,1)))
               where N(0,1) uses np.random.default_rng(42)
 ```
 
-This models ~30 ms base overhead plus ~0.9 ms/token decode rate, with multiplicative
-log-normal noise (σ=0.35, ≈±42% at 1σ). Both `output_length` and `input_length` are
-observable at job-submit time in real LLM serving systems. **No post-execution leakage**.
+This models ~30 ms base overhead plus ~0.9 ms/token decode rate, with multiplicative log-normal noise (σ=0.35, ≈±42% at 1σ). Both `output_length` and `input_length` are observable at job-submit time in real LLM serving systems. **No post-execution leakage**.
 
-**Task-type binning**: `output_length` (Response tokens) is binned into three task types
-to give `recent_mean_ms_this_type` discriminative signal:
+**Task-type binning**: `output_length` (Response tokens) is binned into three task types to give `recent_mean_ms_this_type` discriminative signal:
 
 | Bin | output_length | task_type | Share (1.1k sample) | Synthesised mean | Synthesised p99 |
 |---|---|---|---|---|---|
@@ -84,29 +68,20 @@ CHRONOQ_BENCH_OFFLINE=0 uv run python -m chronoq_bench.experiments.jct_vs_load -
 ```
 Downloads `data/BurstGPT_1.csv` (~50 MB) on first run; cached as parquet on subsequent runs.
 
-CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row stratified sample committed at
-`bench/fixtures/burstgpt_ci_sample.parquet`, 34/33/33 across short/medium/long).
+CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row stratified sample committed at `bench/fixtures/burstgpt_ci_sample.parquet`, 34/33/33 across short/medium/long).
 
-### Google Borg 2011 (Wave 2 Track B4)
+### Google Borg 2011
 
-Cluster-batch scheduling trace from a Google Borg cell (May 2011, 29 days, ~12.5K machines).
-Source: public GCS bucket `gs://clusterdata-2011-2` — no BigQuery auth needed.
-Licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Cluster-batch scheduling trace from a Google Borg cell (May 2011, 29 days, ~12.5K machines). Source: public GCS bucket `gs://clusterdata-2011-2` — no BigQuery auth needed. Licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ```bash
 # Downloads ~3.9MB gzip shard from GCS on first run, cached to bench/data/borg/
 CHRONOQ_BENCH_OFFLINE=0 uv run python -m chronoq_bench.experiments.jct_vs_load --trace borg
 ```
 
-CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row sample committed at
-`bench/fixtures/borg_ci_sample.parquet`).
+CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row sample committed at `bench/fixtures/borg_ci_sample.parquet`).
 
-**Sampling methodology**: one shard (`part-00000-of-00500`) of the 2011-2 task_events table
-is downloaded. Task duration is reconstructed by matching SUBMIT (event_type=0) and FINISH
-(event_type=4) event pairs. This yields 43,101 tasks with complete durations from the first
-5611 seconds (~93 min) of the trace. Tasks are rejection-sampled to ≤10K rows stratified by
-`scheduling_class` (preserving CDF shape), then shuffled (seed=42) before any train/eval split
-so that `head(n)` returns a representative cross-section of the duration distribution.
+**Sampling methodology**: one shard (`part-00000-of-00500`) of the 2011-2 task_events table is downloaded. Task duration is reconstructed by matching SUBMIT (event_type=0) and FINISH (event_type=4) event pairs. This yields 43,101 tasks with complete durations from the first 5611 seconds (~93 min) of the trace. Tasks are rejection-sampled to ≤10K rows stratified by `scheduling_class` (preserving CDF shape), then shuffled (seed=42) before any train/eval split so that `head(n)` returns a representative cross-section of the duration distribution.
 
 **Borg 2011 task duration statistics**:
 
@@ -119,29 +94,18 @@ so that `head(n)` returns a representative cross-section of the duration distrib
 | max | ~90 min |
 | CoV (std/mean) | ~1.11 |
 
-### Azure Functions 2019 (Wave 2 Track B3)
+### Azure Functions 2019
 
-Serverless function invocation trace from Microsoft Azure Functions (July 2019, 14 days).
-Source: [Azure/AzurePublicDataset](https://github.com/Azure/AzurePublicDataset) public repository.
-Licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-Paper: Shahrad et al., "Serverless in the Wild", USENIX ATC 2020.
+Serverless function invocation trace from Microsoft Azure Functions (July 2019, 14 days). Source: [Azure/AzurePublicDataset](https://github.com/Azure/AzurePublicDataset) public repository. Licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/). Paper: Shahrad et al., "Serverless in the Wild", USENIX ATC 2020.
 
 ```bash
 # Downloads ~137MB tarball from Azure Blob Storage on first run, cached to bench/data/azure/
 CHRONOQ_BENCH_OFFLINE=0 uv run python -m chronoq_bench.experiments.jct_vs_load --trace azure
 ```
 
-CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row sample committed at
-`bench/fixtures/azure_ci_sample.parquet`).
+CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row sample committed at `bench/fixtures/azure_ci_sample.parquet`).
 
-**Sampling methodology**: day 1 invocation counts (`invocations_per_function_md.anon.d01.csv`)
-and duration percentiles (`function_durations_percentiles.anon.d01.csv`) are joined on
-`HashFunction`. The highest-activity 60-minute window (minutes 817–876, containing 42.8M
-invocations across 23,444 valid functions) is selected. Each function is capped at 500
-samples (diversity cap) and its per-minute invocation counts are expanded into individual
-task records: arrivals spread uniformly within each minute; durations sampled from a log-normal
-fitted to p25/p50/p75. This yields 353,610 total rows across 7,917 unique function hashes
-(seed=42). The cache is sorted by arrival_ms so `head(n)` returns a representative cross-section.
+**Sampling methodology**: day 1 invocation counts (`invocations_per_function_md.anon.d01.csv`) and duration percentiles (`function_durations_percentiles.anon.d01.csv`) are joined on `HashFunction`. The highest-activity 60-minute window (minutes 817–876, containing 42.8M invocations across 23,444 valid functions) is selected. Each function is capped at 500 samples (diversity cap) and its per-minute invocation counts are expanded into individual task records: arrivals spread uniformly within each minute; durations sampled from a log-normal fitted to p25/p50/p75. This yields 353,610 total rows across 7,917 unique function hashes (seed=42). The cache is sorted by arrival_ms so `head(n)` returns a representative cross-section.
 
 **Azure Functions duration statistics (from cache)**:
 
@@ -168,17 +132,9 @@ fitted to p25/p50/p75. This yields 353,610 total rows across 7,917 unique functi
 
 ## Results — Google Borg 2011 trace
 
-Experiment: `n_train=800`, `n_eval=300`, 10 seeds [42–51]. Trace: `borg` (community shard from
-GCS public bucket `gs://clusterdata-2011-2`, CC-BY 4.0).
+Experiment: `n_train=800`, `n_eval=300`, 10 seeds [42–51]. Trace: `borg` (community shard from GCS public bucket `gs://clusterdata-2011-2`, CC-BY 4.0).
 
-**Headline: LambdaRank benefits scale with load.** At light load (ρ ≤ 0.7) scheduling
-rarely matters — nothing queues long enough for ordering to pay off, and every scheduler
-(including the SJF-oracle upper bound) produces nearly identical JCT. Under saturation
-(ρ ≥ 0.8), queue-ordering decisions dominate JCT and LambdaRank delivers **+14–22% mean JCT
-improvement vs FCFS**. The familiar SJF-family tradeoff applies: mean-JCT wins come paired
-with **p99 starvation at the tail** as aggressive short-first ordering indefinitely delays
-long batch jobs. See observation 4 below and the Limitations section — pair with aging
-in production.
+**Headline: LambdaRank benefits scale with load.** At light load (ρ ≤ 0.7) scheduling rarely matters — nothing queues long enough for ordering to pay off, and every scheduler (including the SJF-oracle upper bound) produces nearly identical JCT. Under saturation (ρ ≥ 0.8), queue-ordering decisions dominate JCT and LambdaRank delivers **+14–22% mean JCT improvement vs FCFS**. The familiar SJF-family tradeoff applies: mean-JCT wins come paired with **p99 starvation at the tail** as aggressive short-first ordering indefinitely delays long batch jobs. See observation 4 below and the Limitations section — pair with aging in production.
 
 ### Mean JCT (ms) vs FCFS — median across 10 seeds
 
@@ -206,70 +162,38 @@ in production.
 
 ### Exit criteria vs Borg trace
 
-The exit criteria (≥10% mean JCT, ≥15% p99 JCT vs FCFS at load=0.7) are defined for the
-synthetic Pareto trace and **do not apply to the Borg trace**. The ρ=0.7 operating point is
-simply too far from saturation for any queue-ordering scheme to matter on this workload;
-see the headline note above. The one synthetic gate that does transfer holds here:
+The exit criteria (≥10% mean JCT, ≥15% p99 JCT vs FCFS at load=0.7) are defined for the synthetic Pareto trace and **do not apply to the Borg trace**. The ρ=0.7 operating point is simply too far from saturation for any queue-ordering scheme to matter on this workload; see the headline note above. The one synthetic gate that does transfer holds here:
 
-**p99 gap vs SJF-oracle @ load=0.7**: 12.5% — within the 20% target. LambdaRank tracks the
-clairvoyant SJF upper bound at the tail.
+**p99 gap vs SJF-oracle @ load=0.7**: 12.5% — within the 20% target. LambdaRank tracks the clairvoyant SJF upper bound at the tail.
 
 ### Borg-specific workload observations
 
 1. **Directional, not absolute, comparison.** Borg durations are 3–4 orders of magnitude
-   longer than typical Celery tasks (15 s–90 min vs 10 ms–30 s). The relative-ordering
-   signal is trace-agnostic, but the absolute JCT numbers here are cluster-batch-scale and
-   are not comparable to BurstGPT or synthetic results.
+   longer than typical Celery tasks (15 s–90 min vs 10 ms–30 s). The relative-ordering signal is trace-agnostic, but the absolute JCT numbers here are cluster-batch-scale and are not comparable to BurstGPT or synthetic results.
 
 2. **Benefits scale with load.** At ρ ≤ 0.7 the queue rarely holds more than one or two
-   waiting jobs, so scheduling choice is nearly a no-op — even SJF-oracle only wins 0-15%
-   mean JCT vs FCFS at ρ=0.7. The product story is the **ρ ≥ 0.8 regime**: +14.4% mean JCT
-   at ρ=0.8 and +22.3% at ρ=0.9 vs FCFS. This is where queue-ordering matters in production.
+   waiting jobs, so scheduling choice is nearly a no-op — even SJF-oracle only wins 0-15% mean JCT vs FCFS at ρ=0.7. The product story is the **ρ ≥ 0.8 regime**: +14.4% mean JCT at ρ=0.8 and +22.3% at ρ=0.9 vs FCFS. This is where queue-ordering matters in production.
 
 3. **Low type diversity weakens the primary feature.** 96% of tasks are `scheduling_class=0`
-   (best-effort batch). The primary discriminator `recent_mean_ms_this_type` (which carries
-   ~80% of gain on the synthetic trace) has weak signal when nearly all tasks share the same
-   type label. What's left is `payload_size` (derived from Borg `cpu_request`) and feature
-   interactions — a harder learning problem than the synthetic trace presents, which is why
-   the model's mean-JCT wins are narrower than the oracle's at every load point.
+   (best-effort batch). The primary discriminator `recent_mean_ms_this_type` (which carries ~80% of gain on the synthetic trace) has weak signal when nearly all tasks share the same type label. What's left is `payload_size` (derived from Borg `cpu_request`) and feature interactions — a harder learning problem than the synthetic trace presents, which is why the model's mean-JCT wins are narrower than the oracle's at every load point.
 
 4. **p99 starvation at high load is a class-property, not a LambdaRank bug.** At ρ ≥ 0.8,
-   LambdaRank p99 is 2–3× worse than FCFS. This is the SJF-family tradeoff: the short-first
-   bias that drives the mean-JCT win indefinitely delays long batch jobs at the tail. Even
-   SJF-oracle p99 degrades at ρ=0.9. In production at saturation, pair the ranker with
-   aging or priority-decay to bound worst-case latency (same guidance as for SRPT-family
-   schedulers; see Limitations below).
+   LambdaRank p99 is 2–3× worse than FCFS. This is the SJF-family tradeoff: the short-first bias that drives the mean-JCT win indefinitely delays long batch jobs at the tail. Even SJF-oracle p99 degrades at ρ=0.9. In production at saturation, pair the ranker with aging or priority-decay to bound worst-case latency (same guidance as for SRPT-family schedulers; see Limitations below).
 
 5. **Feature importance (expected, not yet measured on Borg).** `recent_mean_ms_this_type`
-   should contribute less gain on Borg than on synthetic (because most tasks share a type),
-   with `payload_size` picking up relatively more weight. A Borg-specific ablation run is
-   tracked for a follow-up sprint.
+   should contribute less gain on Borg than on synthetic (because most tasks share a type), with `payload_size` picking up relatively more weight. A Borg-specific ablation run is tracked for a follow-up sprint.
 
 ## Results — Azure Functions 2019 trace
 
-Experiment: `n_train=800`, `n_eval=300`, 10 seeds [42–51]. Trace: `azure` (Azure Public Dataset
-2019, CC-BY 4.0). Results JSON: `bench/artifacts/results_azure.json`.
+Experiment: `n_train=800`, `n_eval=300`, 10 seeds [42–51]. Trace: `azure` (Azure Public Dataset 2019, CC-BY 4.0). Results JSON: `bench/artifacts/results_azure.json`.
 
 ### TL;DR — a diagnostic, not a failure
 
-Azure Functions is the first trace where **no scheduler can improve p99** — SJF-oracle (the
-theoretical upper bound that knows every job's true duration) lands within 0.02% of FCFS on p99.
-The tail is dominated by a thin slice of long-running rare functions; their queuing delay is
-structural, not a scheduling decision. LambdaRank still delivers the headline **+10.0% mean JCT
-at load 0.7** (rising to +15–25% at ρ ≥ 0.8), but does so by moving work among the thick body of
-the distribution — which is exactly where learned ranking helps.
+Azure Functions is the first trace where **no scheduler can improve p99** — SJF-oracle (the theoretical upper bound that knows every job's true duration) lands within 0.02% of FCFS on p99. The tail is dominated by a thin slice of long-running rare functions; their queuing delay is structural, not a scheduling decision. LambdaRank still delivers the headline **+10.0% mean JCT at load 0.7** (rising to +15–25% at ρ ≥ 0.8), but does so by moving work among the thick body of the distribution — which is exactly where learned ranking helps.
 
-Read this section as guidance for picking workloads: **LambdaRank pays off when task-type
-diversity and per-type duration stability both exist.** Azure violates the second assumption
-(7,917 unique `HashFunction` values, 91% singletons in a 10K sample), which collapses the
-strongest feature (`recent_mean_ms_this_type`) to its cold-start value for most eval-time jobs.
-The mean-JCT win comes from the small subset of recurring types the ranker *can* learn; the p99
-regression reflects the same greediness compounding with irreducible tail tasks. SJF-oracle's
-matching p99 result is the proof that no policy — learned or clairvoyant — can fix this tail
-with ordering alone.
+Read this section as guidance for picking workloads: **LambdaRank pays off when task-type diversity and per-type duration stability both exist.** Azure violates the second assumption (7,917 unique `HashFunction` values, 91% singletons in a 10K sample), which collapses the strongest feature (`recent_mean_ms_this_type`) to its cold-start value for most eval-time jobs. The mean-JCT win comes from the small subset of recurring types the ranker *can* learn; the p99 regression reflects the same greediness compounding with irreducible tail tasks. SJF-oracle's matching p99 result is the proof that no policy — learned or clairvoyant — can fix this tail with ordering alone.
 
-Numbers follow; the "Azure-specific workload observations" block below walks through the root
-cause feature-by-feature.
+Numbers follow; the "Azure-specific workload observations" block below walks through the root cause feature-by-feature.
 
 ### Mean JCT (ms) vs FCFS — median across 10 seeds
 
@@ -303,45 +227,21 @@ cause feature-by-feature.
 | p99 JCT vs FCFS @ load=0.7 | ≥+15% | −16.9% | ❌ |
 | p99 gap vs SJF-oracle @ load=0.7 | ≤20% | 16.9% | ✅ |
 
-The mean JCT gate passes exactly at 10.0%. The p99 gate does not pass on the Azure trace —
-this is a workload-structural finding, not a model deficiency (see observations below). The
-Chunk 2 exit criteria were defined for the synthetic Pareto trace and `recent_mean_ms_this_type`
-works best with a small number of recurring task types.
+The mean JCT gate passes exactly at 10.0%. The p99 gate does not pass on the Azure trace — this is a workload-structural finding, not a model deficiency (see observations below). The The exit criteria were defined for the synthetic Pareto trace and `recent_mean_ms_this_type` works best with a small number of recurring task types.
 
 ### Azure-specific workload observations
 
 1. **Extreme type diversity causes cold-start noise in `recent_mean_ms_this_type`**: Azure has
-   7,917 unique `HashFunction` values (serverless function identities). With 800 training jobs,
-   each type has on average ~0.1 training examples; 91% of types in the 100-row CI sample are
-   singletons. The type-level statistics (`recent_mean_ms_this_type`, `recent_p95_ms_this_type`,
-   `recent_count_this_type`) collapse to their cold-start zeros for any eval-time type not seen
-   during training. On the synthetic trace, `recent_mean_ms_this_type` carries ~80% of model
-   gain; on Azure, that signal is only available for the ~2% of types that recur. Compounding
-   the problem, the Azure loader sets `payload_size=1` for every invocation (the dataset does
-   not publish per-call payload sizes), so the second-strongest synthetic feature is a constant
-   on this trace. The ranker effectively orders by type-level signal on recurring types and by
-   queue-state features everywhere else — enough to move mean JCT, not enough to influence p99.
+   7,917 unique `HashFunction` values (serverless function identities). With 800 training jobs, each type has on average ~0.1 training examples; 91% of types in the 100-row CI sample are singletons. The type-level statistics (`recent_mean_ms_this_type`, `recent_p95_ms_this_type`, `recent_count_this_type`) collapse to their cold-start zeros for any eval-time type not seen during training. On the synthetic trace, `recent_mean_ms_this_type` carries ~80% of model gain; on Azure, that signal is only available for the ~2% of types that recur. Compounding the problem, the Azure loader sets `payload_size=1` for every invocation (the dataset does not publish per-call payload sizes), so the second-strongest synthetic feature is a constant on this trace. The ranker effectively orders by type-level signal on recurring types and by queue-state features everywhere else — enough to move mean JCT, not enough to influence p99.
 
 2. **p99 starvation from greedy short-first bias**: LambdaRank p99 is 16.9% *worse* than FCFS
-   at load=0.7. The same short-first bias that reduces mean JCT by 10% comes at a tail cost:
-   a small number of `timer` and `orchestration` functions with long average durations
-   (10–50 s) are systematically deprioritised, pushing tail latency up. This pattern mirrors
-   the Borg trace's behaviour at high load, but appears earlier because type-overlap between
-   training and eval sets is lower.
+   at load=0.7. The same short-first bias that reduces mean JCT by 10% comes at a tail cost: a small number of `timer` and `orchestration` functions with long average durations (10–50 s) are systematically deprioritised, pushing tail latency up. This pattern mirrors the Borg trace's behaviour at high load, but appears earlier because type-overlap between training and eval sets is lower.
 
 3. **SJF-oracle shows near-zero p99 improvement over FCFS** (the structural proof): SJF-oracle
-   achieves essentially the same p99 as FCFS (164,371 ms vs 164,341 ms — a 0.02% gap). Because
-   SJF-oracle has perfect knowledge of every job's true duration, this result is a provable
-   upper bound: **no scheduler — learned, heuristic, or clairvoyant — can improve p99 on this
-   trace**. The Azure tail is composed of rare long-running functions (~164 s at p99) whose
-   queuing delay is dominated by their own size, not by scheduling order. Use this as the
-   yard-stick: the LambdaRank p99 regression at ρ=0.7 is the *cost* of mean-JCT optimization
-   on a trace whose tail cannot be scheduled away, not a defect of the ranker.
+   achieves essentially the same p99 as FCFS (164,371 ms vs 164,341 ms — a 0.02% gap). Because SJF-oracle has perfect knowledge of every job's true duration, this result is a provable upper bound: **no scheduler — learned, heuristic, or clairvoyant — can improve p99 on this trace**. The Azure tail is composed of rare long-running functions (~164 s at p99) whose queuing delay is dominated by their own size, not by scheduling order. Use this as the yard-stick: the LambdaRank p99 regression at ρ=0.7 is the *cost* of mean-JCT optimization on a trace whose tail cannot be scheduled away, not a defect of the ranker.
 
 4. **Generalisation evidence**: Despite the p99 result, the mean JCT improvement at load=0.7
-   (+10.0%) and high load (+15–25%) demonstrates LambdaRank generalises beyond the synthetic
-   trace. Azure's fundamentally different structure (7,917 types vs 5, heavy invocation skew,
-   timer-dominated traffic) still yields a learned useful ordering for mean JCT.
+   (+10.0%) and high load (+15–25%) demonstrates LambdaRank generalises beyond the synthetic trace. Azure's fundamentally different structure (7,917 types vs 5, heavy invocation skew, timer-dominated traffic) still yields a learned useful ordering for mean JCT.
 
 ## Results — Synthetic Pareto trace
 
@@ -397,7 +297,7 @@ The target of ≥15% p99 improvement at load=0.5 requires **BurstGPT's extreme v
 
 ### Training statistics at inference time
 
-The `recent_mean_ms_this_type` feature (80% of model gain) is computed from the training partition at experiment time and passed as a frozen lookup to `LambdaRankScheduler`. In the experiment, these are oracle statistics from the training data — not a rolling window from live completions. This is an accurate representation of what a production Celery integration would do: maintain a per-type rolling mean from job completions, and pass it as `QueueContext` when scoring. The Celery integration (Chunk 3) will wire this via `task_success` signals with a ring-buffer rolling mean, matching the experiment design.
+The `recent_mean_ms_this_type` feature (80% of model gain) is computed from the training partition at experiment time and passed as a frozen lookup to `LambdaRankScheduler`. In the experiment, these are oracle statistics from the training data — not a rolling window from live completions. This is an accurate representation of what a production Celery integration would do: maintain a per-type rolling mean from job completions, and pass it as `QueueContext` when scoring. The `chronoq-celery` integration wires this via `task_success` signals with a ring-buffer rolling mean, matching the experiment design.
 
 ### Non-preemptive SRPT
 
@@ -409,34 +309,19 @@ At very high queue load (ρ ≥ 0.8), aggressive SJF-type scheduling starves lon
 
 ### Multi-worker simulation
 
-The simulator supports `n_workers` via `simpy.Resource(capacity=n_workers)` — added in Wave 1 track B5. The `jct_vs_concurrency` experiment sweeps concurrency ∈ {1,2,4,8,16} at ρ=0.7. The JCT results above use `n_workers=1` (default); multi-worker results are in `bench/artifacts/jct_vs_concurrency.png`. At higher concurrency, HOL blocking decreases and the absolute JCT gap between LambdaRank and FCFS narrows, though the directional improvement persists.
+The simulator supports `n_workers` via `simpy.Resource(capacity=n_workers)`. The `jct_vs_concurrency` experiment sweeps concurrency ∈ {1,2,4,8,16} at ρ=0.7. The JCT results above use `n_workers=1` (default); multi-worker results are in `bench/artifacts/jct_vs_concurrency.png`. At higher concurrency, HOL blocking decreases and the absolute JCT gap between LambdaRank and FCFS narrows, though the directional improvement persists.
 
 ## Results — BurstGPT trace
 
-**Headline**: LambdaRank tracks the SJF-oracle upper bound within **5.1% at p99 @ load=0.7**
-on BurstGPT — i.e. the ranker is making near-optimal ordering decisions on a real LLM
-trace. The Chunk-2 gate targets (+10% mean, +15% p99 vs FCFS) were calibrated on the
-synthetic Pareto trace whose short-to-long duration ratio is **56×**; BurstGPT's ratio is
-**11×**, which mechanically compresses the achievable improvement band. The comparison that
-actually measures model quality — ranker-vs-oracle — is on target. The FCFS-relative
-numbers are workload-structural and are reported honestly below.
+**Headline**: LambdaRank tracks the SJF-oracle upper bound within **5.1% at p99 @ load=0.7** on BurstGPT — i.e. the ranker is making near-optimal ordering decisions on a real LLM trace. The synthetic Pareto gate targets (+10% mean, +15% p99 vs FCFS) were calibrated on the synthetic Pareto trace whose short-to-long duration ratio is **56×**; BurstGPT's ratio is **11×**, which mechanically compresses the achievable improvement band. The comparison that actually measures model quality — ranker-vs-oracle — is on target. The FCFS-relative numbers are workload-structural and are reported honestly below.
 
-**How to read this section**: the **p99 gap vs SJF-oracle** row is the ML signal. The
-**vs FCFS** rows describe what the *workload* allows, not what the *model* can do. When
-SJF-oracle itself underperforms FCFS at p99 (as happens here at ρ≥0.6), no non-preemptive
-scheduler can beat FCFS at that percentile — the workload is structurally starvation-prone
-and the right fix is pairing with an aging policy (see Limitations).
+**How to read this section**: the **p99 gap vs SJF-oracle** row is the ML signal. The **vs FCFS** rows describe what the *workload* allows, not what the *model* can do. When SJF-oracle itself underperforms FCFS at p99 (as happens here at ρ≥0.6), no non-preemptive scheduler can beat FCFS at that percentile — the workload is structurally starvation-prone and the right fix is pairing with an aging policy (see Limitations).
 
 Full sweep run: 2026-04-24.
 
-**Parameters**: `n_train=800`, `n_eval=300`, seeds=[42..51] (10 seeds),
-feature schema `default-v1-2026-04` (15 features), load_points=[0.3,0.4,0.5,0.6,0.7,0.8,0.9].
-Dataset: `lzzmm/BurstGPT` `data/BurstGPT_1.csv`, 1,429,737 rows (25,443 zero-token rows filtered).
+**Parameters**: `n_train=800`, `n_eval=300`, seeds=[42..51] (10 seeds), feature schema `default-v1-2026-04` (15 features), load_points=[0.3,0.4,0.5,0.6,0.7,0.8,0.9]. Dataset: `lzzmm/BurstGPT` `data/BurstGPT_1.csv`, 1,429,737 rows (25,443 zero-token rows filtered).
 
-**Per-seed variance note**: All 10 seeds produce identical results because the BurstGPT
-trace is loaded from a fixed parquet cache — the 1,100-job subsample is the same every run.
-Unlike the synthetic trace (where each seed generates independent random jobs), the BurstGPT
-multi-seed sweep measures determinism rather than variance.
+**Per-seed variance note**: All 10 seeds produce identical results because the BurstGPT trace is loaded from a fixed parquet cache — the 1,100-job subsample is the same every run. Unlike the synthetic trace (where each seed generates independent random jobs), the BurstGPT multi-seed sweep measures determinism rather than variance.
 
 ### Mean JCT — all load points
 
@@ -464,8 +349,7 @@ multi-seed sweep measures determinism rather than variance.
 
 ### Gate results
 
-Ordered so the ML-quality signal reads first; the FCFS-relative gates follow with the
-workload context that explains each miss.
+Ordered so the ML-quality signal reads first; the FCFS-relative gates follow with the workload context that explains each miss.
 
 | Gate | Target | Actual | Status | Reads as |
 |---|---|---|---|---|
@@ -483,8 +367,7 @@ workload context that explains each miss.
 | `recent_count_this_type` | 0.6% |
 | All others | 0.0% each |
 
-The task-type binning (Option B) successfully restored multi-type structure.
-`recent_mean_ms_this_type` carries 79.9% of gain — matching the synthetic trace (79.9%).
+The task-type binning (Option B) successfully restored multi-type structure. `recent_mean_ms_this_type` carries 79.9% of gain — matching the synthetic trace (79.9%).
 
 ### Reproduce
 
@@ -501,58 +384,29 @@ CHRONOQ_BENCH_OFFLINE=0 uv run python -m chronoq_bench.experiments.jct_vs_load -
 
 **p99 JCT @ 0.7: −34.2% (target ≥+15%)** — substantially worse than FCFS.
 
-These are not model failures. They are a textbook consequence of non-preemptive SJF-family
-scheduling on a workload with narrow duration variance, and SJF-oracle reproduces the same
-behavior (see below). Production deployments facing similar LLM-inference workloads should
-pair LambdaRank with an aging policy so long jobs are promoted past a wait threshold —
-chronoq-ranker exposes the score but not the aging logic; the integration (Celery plugin,
-custom scheduler) owns that policy.
+These are not model failures. They are a textbook consequence of non-preemptive SJF-family scheduling on a workload with narrow duration variance, and SJF-oracle reproduces the same behavior (see below). Production deployments facing similar LLM-inference workloads should pair LambdaRank with an aging policy so long jobs are promoted past a wait threshold — chronoq-ranker exposes the score but not the aging logic; the integration (Celery plugin, custom scheduler) owns that policy.
 
-**Starvation mechanism**: BurstGPT's output_length distribution is heavily right-skewed —
-36% of jobs are `llm_short` (<100 tokens, mean 58ms) but 24% are `llm_long` (>400 tokens,
-mean 624ms). At load=0.7, the ranker correctly identifies short jobs and schedules them
-first, cutting mean JCT by 8.6%. However, `llm_long` jobs (max synthesised duration 2950ms)
-are repeatedly bypassed by arriving short jobs, inflating their wait time. The p99 job is
-almost always an `llm_long` job that experienced severe starvation.
+**Starvation mechanism**: BurstGPT's output_length distribution is heavily right-skewed — 36% of jobs are `llm_short` (<100 tokens, mean 58ms) but 24% are `llm_long` (>400 tokens, mean 624ms). At load=0.7, the ranker correctly identifies short jobs and schedules them first, cutting mean JCT by 8.6%. However, `llm_long` jobs (max synthesised duration 2950ms) are repeatedly bypassed by arriving short jobs, inflating their wait time. The p99 job is almost always an `llm_long` job that experienced severe starvation.
 
-**Oracle confirms**: SJF-oracle at load=0.7 also shows p99=2944.6ms — **worse than FCFS
-(2306.2ms)**. This confirms the starvation is a property of the BurstGPT workload at this
-load point, not a model deficiency. LambdaRank's p99 is only 5.1% above SJF-oracle (gate: ≤20%) —
-the model matches oracle starvation behavior exactly.
+**Oracle confirms**: SJF-oracle at load=0.7 also shows p99=2944.6ms — **worse than FCFS (2306.2ms)**. This confirms the starvation is a property of the BurstGPT workload at this load point, not a model deficiency. LambdaRank's p99 is only 5.1% above SJF-oracle (gate: ≤20%) — the model matches oracle starvation behavior exactly.
 
-**Why mean JCT misses by 1.4 pp**: The BurstGPT `llm_short` / `llm_long` mean contrast
-(58ms vs 624ms, ratio 11×) is weaker than the synthetic trace's `resize` / `transcode`
-contrast (57ms vs 3220ms, ratio 56×). Less type-level contrast means less absolute JCT gain
-from priority scheduling. The synthetic trace's 10× wider ratio is why it easily meets the
-10% mean JCT gate while BurstGPT misses by 1.4 pp.
+**Why mean JCT misses by 1.4 pp**: The BurstGPT `llm_short` / `llm_long` mean contrast (58ms vs 624ms, ratio 11×) is weaker than the synthetic trace's `resize` / `transcode` contrast (57ms vs 3220ms, ratio 56×). Less type-level contrast means less absolute JCT gain from priority scheduling. The synthetic trace's 10× wider ratio is why it easily meets the 10% mean JCT gate while BurstGPT misses by 1.4 pp.
 
 ### Duration synthesis is not measured latency
 
-`duration_ms` is synthesised from `output_length` via a deterministic lognormal formula.
-The public `lzzmm/BurstGPT` dataset (April 2026) omits end-to-end latency measurements.
+`duration_ms` is synthesised from `output_length` via a deterministic lognormal formula. The public `lzzmm/BurstGPT` dataset (April 2026) omits end-to-end latency measurements.
 
-**Leakage audit**: The synthesis formula uses only `output_length` (Response tokens),
-which is observable at request-submit time in LLM serving systems that expose token count
-estimates. The formula does not use:
+**Leakage audit**: The synthesis formula uses only `output_length` (Response tokens), which is observable at request-submit time in LLM serving systems that expose token count estimates. The formula does not use:
 - Measured wall-clock time
 - Queue exit timestamps
 - Any post-execution signal
 
-The synthesised durations are therefore observationally valid for a scheduling simulation.
-The correlation between token count and actual latency is well-established (R² ≈ 0.6–0.8
-for fixed hardware); our lognormal noise (σ=0.35) avoids over-fitting to a perfectly
-rank-preserving duration.
+The synthesised durations are therefore observationally valid for a scheduling simulation. The correlation between token count and actual latency is well-established (R² ≈ 0.6–0.8 for fixed hardware); our lognormal noise (σ=0.35) avoids over-fitting to a perfectly rank-preserving duration.
 
 ### Binning scheme sensitivity
 
-The three-bin schema (`<100`, `100–400`, `>400` tokens) matches natural percentile breaks
-in the output_length distribution (≈P65 and P90). Finer binning (5 buckets) would widen
-type-mean contrast but reduce per-type training counts and risk LambdaRank instability.
-Two bins would simplify but reduce p99 protection for medium jobs. Sensitivity analysis over
-binning choices is not included in this sweep.
+The three-bin schema (`<100`, `100–400`, `>400` tokens) matches natural percentile breaks in the output_length distribution (≈P65 and P90). Finer binning (5 buckets) would widen type-mean contrast but reduce per-type training counts and risk LambdaRank instability. Two bins would simplify but reduce p99 protection for medium jobs. Sensitivity analysis over binning choices is not included in this sweep.
 
 ### Per-seed variance
 
-A proper variance study would draw different random subsamples of the 1.4M-row dataset per
-seed. This sweep used a single fixed subsample across all 10 seeds — identical results
-across seeds confirm determinism but do not bound sampling variance. Planned for a future run.
+A proper variance study would draw different random subsamples of the 1.4M-row dataset per seed. This sweep used a single fixed subsample across all 10 seeds — identical results across seeds confirm determinism but do not bound sampling variance. Planned for a future run.

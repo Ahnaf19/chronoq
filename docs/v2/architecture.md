@@ -1,7 +1,6 @@
 ---
 status: current
-last-synced-to-plan: 2026-04-21
-last-shipped-chunk: 1-W2
+last-synced-to-plan: 2026-04-24
 source: "plan §3"
 ---
 
@@ -9,25 +8,25 @@ source: "plan §3"
 
 ## v1 → v2 component map
 
-Status markers: ✅ shipped (Chunk 0 or 1 W2) · ⏳ pending chunk.
+All v1 components listed below have been migrated. Status column uses v0.X.Y release labels.
 
 | v1 component | v2 fate | Status |
 |---|---|---|
-| `TaskPredictor` (`predictor/chronoq_predictor/predictor.py`) | Renamed to `TaskRanker` in `ranker/chronoq_ranker/ranker.py`; v1 import retained as 22-line deprecated shim that emits `DeprecationWarning` | ✅ W2 |
-| `HeuristicEstimator` | Retained unchanged as cold-start fallback (renamed to `RankByMeanEstimator` pending W3/4) | ✅ W2 (Chunk 0 rename deferred) |
-| `GradientEstimator` (sklearn GBR) | Replaced by `LambdaRankEstimator` (LightGBM `LGBMRanker`, lambdarank objective) | ⏳ W3 |
-| `extract_features` free function | Rewritten as `DefaultExtractor` + versioned `FeatureSchema` (15 features). Legacy shim retained with `DeprecationWarning`; internal callers use private `_legacy_*` helpers | ✅ W2 |
-| `TaskRecord` | Extended with `group_id`, `rank_label`, `feature_schema_version` (all defaulted → v1 records deserialize unchanged). `SqliteStore` migrated via idempotent `ALTER TABLE ADD COLUMN` | ✅ W2 |
-| `PredictorConfig` | Renamed `RankerConfig`; added `incremental_rounds`, `min_groups`, `full_refit_every_n_incrementals`, `psi_threshold`. `PredictorConfig` silent alias retained | ✅ W2 |
-| `SqliteStore` / `MemoryStore` | Retained; Parquet export helper pending | ⏳ Chunk 2 |
-| `TaskQueue` (Redis) | Demoted to `demo-server/` reference | ✅ Chunk 0 |
-| `Scheduler`, `WorkerPool` | Demoted; still consume the renamed ranker | ✅ Chunk 0 |
-| `simulate_task()` | To be replaced by SimPy + real traces in `chronoq-bench` | ⏳ Chunk 2 |
-| `PredictionTracker` | To move to `bench/chronoq_bench/metrics/tracker.py` + add ρ/τ/pairwise | ⏳ Chunk 2 |
-| Alembic migrations | Deleted (overkill for a CLI tool) | ✅ Chunk 0 |
-| 47 predictor tests | Moved to `tests/ranker/`; +4 compat-shim tests +8 predict_scores tests = 59 | ✅ W2 |
-| `TaskCandidate`, `ScoredTask`, `QueueContext`, `FeatureSchema`, `FeatureExtractor`, `predict_scores(list)` method, `DEFAULT_SCHEMA_V1` | New public surface (additive) | ✅ W2 |
-| `LambdaRankEstimator`, `OracleRanker`, `drift.py` (PSI + rolling MAE) | New modules | ⏳ W3 |
+| `TaskPredictor` (`predictor/chronoq_predictor/predictor.py`) | Renamed to `TaskRanker` in `ranker/chronoq_ranker/ranker.py`; v1 import retained as 22-line deprecated shim that emits `DeprecationWarning` | ✅ v0.2.0 |
+| `HeuristicEstimator` | Retained unchanged as cold-start fallback | ✅ v0.2.0 |
+| `GradientEstimator` (sklearn GBR) | Replaced by `LambdaRankEstimator` (LightGBM `LGBMRanker`, lambdarank objective) | ✅ v0.2.0 |
+| `extract_features` free function | Rewritten as `DefaultExtractor` + versioned `FeatureSchema` (15 features). Legacy shim retained with `DeprecationWarning`; internal callers use private `_legacy_*` helpers | ✅ v0.2.0 |
+| `TaskRecord` | Extended with `group_id`, `rank_label`, `feature_schema_version` (all defaulted → v1 records deserialize unchanged). `SqliteStore` migrated via idempotent `ALTER TABLE ADD COLUMN` | ✅ v0.2.0 |
+| `PredictorConfig` | Renamed `RankerConfig`; added `incremental_rounds`, `min_groups`, `full_refit_every_n_incrementals`, `psi_threshold`. `PredictorConfig` silent alias retained | ✅ v0.2.0 |
+| `SqliteStore` / `MemoryStore` | Retained | ✅ v0.2.0 |
+| `TaskQueue` (Redis) | Demoted to `demo-server/` reference | ✅ v0.2.0 |
+| `Scheduler`, `WorkerPool` | Demoted to `demo-server/`; real scheduling moved to `chronoq-celery` | ✅ v0.2.0 |
+| `simulate_task()` | Replaced by SimPy + real traces in `chronoq-bench` | ✅ v0.2.0 |
+| `PredictionTracker` | Moved to `bench/chronoq_bench/metrics/` + ρ/τ/pairwise metrics added | ✅ v0.2.0 |
+| Alembic migrations | Deleted (overkill for a CLI tool) | ✅ v0.2.0 |
+| 47 predictor tests | Moved to `tests/ranker/`; compat-shim + predict_scores tests added | ✅ v0.2.0 |
+| `TaskCandidate`, `ScoredTask`, `QueueContext`, `FeatureSchema`, `FeatureExtractor`, `predict_scores(list)` method, `DEFAULT_SCHEMA_V1` | New public surface (additive) | ✅ v0.2.0 |
+| `LambdaRankEstimator`, `OracleRanker`, `drift.py` (PSI + rolling MAE) | New modules | ✅ v0.2.0 |
 
 ## Repo layout (v2)
 
@@ -42,16 +41,15 @@ chronoq/
 │       ├── models/            # base.py, heuristic.py, lambdarank.py, oracle.py
 │       ├── storage/           # base.py, memory.py, sqlite.py
 │       └── drift.py           # DriftDetector (PSI + rolling MAE)
-├── bench/                     # chronoq-bench (Chunk 2)
+├── bench/                     # chronoq-bench
 │   └── chronoq_bench/
 │       ├── simulator.py       # SimPy DES
-│       ├── traces/            # burstgpt.py, synthetic.py
+│       ├── traces/            # burstgpt.py, borg.py, azure.py, synthetic.py
 │       ├── baselines/         # fcfs, priority_fcfs, sjf_oracle, srpt_oracle, random
 │       ├── metrics/           # ranking.py (ρ,τ,pairwise), jct.py (p50/95/99, HoL, Jain)
-│       └── experiments/       # jct_vs_load, drift_recovery, ablation_features
+│       └── experiments/       # jct_vs_load, drift_recovery, ablation_features, jct_vs_concurrency
 ├── integrations/
-│   ├── celery/                # chronoq-celery (Chunk 3)
-│   ├── hatchet/               # sidecar stub (Chunk 4)
+│   ├── celery/                # chronoq-celery
 │   └── vllm/                  # deferred
 ├── demo-server/               # v1 demoted to reference
 └── tests/                     # tests/{ranker,bench,celery,demo_server}/
