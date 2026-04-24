@@ -6,7 +6,7 @@ last-synced-to-plan: 2026-04-22
 # Chronoq Integrations
 
 How to wire `chronoq-ranker` into your job queue. Currently supported: **Celery**.
-Planned: Hatchet sidecar (Chunk 4, optional), vLLM plugin (deferred until GPU budget).
+Planned: Hatchet sidecar (optional, post-v0.2.0), vLLM plugin (deferred until GPU budget).
 
 ## Celery — `chronoq-celery`
 
@@ -96,8 +96,8 @@ bookkeeping needed after `attach_signals()`.
 ### TypeStatsTracker — live rolling statistics
 
 The scheduler uses a `TypeStatsTracker` to compute `recent_mean_ms_this_type` at scoring
-time. This feature carries ~80% of the LambdaRank model's ranking signal (from Chunk 2
-ablation). The tracker updates automatically as tasks complete.
+time. This feature carries ~80% of the LambdaRank model's ranking signal (from the ablation
+experiment — see `docs/v2/BENCHMARKS.md`). The tracker updates automatically as tasks complete.
 
 **Cold start:** on first deploy, the tracker has no observations. Seed it from historical
 data to avoid cold-start ranking:
@@ -184,10 +184,10 @@ longest tasks — in sequential execution, long tasks finish last regardless of 
 
 ---
 
-## Hatchet (planned, Chunk 4)
+## Hatchet (planned)
 
 Hatchet uses static priority 1–5. A sidecar pattern can inject Chronoq scores as priority
-values before task submission. Planned for Chunk 4 if time permits.
+values before task submission. Planned for v0.3.0 if time permits.
 
 ## vLLM (deferred)
 

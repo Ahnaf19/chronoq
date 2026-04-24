@@ -1,8 +1,8 @@
 ---
 status: current
 last-synced-to-plan: 2026-04-24
-last-synced-to-code: "v0.2.0-dev @ 27f1611 (Wave 2 B2 BurstGPT fixes)"
-source: "plan §2 Chunk 2 + sprint tracks B1/B2/B5/B6"
+last-synced-to-code: "v0.2.0-dev @ 27f1611"
+source: "plan §2 + v0.2.0 sprint"
 ---
 
 # Benchmarks
@@ -87,7 +87,7 @@ Downloads `data/BurstGPT_1.csv` (~50 MB) on first run; cached as parquet on subs
 CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row stratified sample committed at
 `bench/fixtures/burstgpt_ci_sample.parquet`, 34/33/33 across short/medium/long).
 
-### Google Borg 2011 (Wave 2 Track B4)
+### Google Borg 2011
 
 Cluster-batch scheduling trace from a Google Borg cell (May 2011, 29 days, ~12.5K machines).
 Source: public GCS bucket `gs://clusterdata-2011-2` — no BigQuery auth needed.
@@ -119,7 +119,7 @@ so that `head(n)` returns a representative cross-section of the duration distrib
 | max | ~90 min |
 | CoV (std/mean) | ~1.11 |
 
-### Azure Functions 2019 (Wave 2 Track B3)
+### Azure Functions 2019
 
 Serverless function invocation trace from Microsoft Azure Functions (July 2019, 14 days).
 Source: [Azure/AzurePublicDataset](https://github.com/Azure/AzurePublicDataset) public repository.
@@ -305,7 +305,7 @@ cause feature-by-feature.
 
 The mean JCT gate passes exactly at 10.0%. The p99 gate does not pass on the Azure trace —
 this is a workload-structural finding, not a model deficiency (see observations below). The
-Chunk 2 exit criteria were defined for the synthetic Pareto trace and `recent_mean_ms_this_type`
+The exit criteria were defined for the synthetic Pareto trace and `recent_mean_ms_this_type`
 works best with a small number of recurring task types.
 
 ### Azure-specific workload observations
@@ -397,7 +397,7 @@ The target of ≥15% p99 improvement at load=0.5 requires **BurstGPT's extreme v
 
 ### Training statistics at inference time
 
-The `recent_mean_ms_this_type` feature (80% of model gain) is computed from the training partition at experiment time and passed as a frozen lookup to `LambdaRankScheduler`. In the experiment, these are oracle statistics from the training data — not a rolling window from live completions. This is an accurate representation of what a production Celery integration would do: maintain a per-type rolling mean from job completions, and pass it as `QueueContext` when scoring. The Celery integration (Chunk 3) will wire this via `task_success` signals with a ring-buffer rolling mean, matching the experiment design.
+The `recent_mean_ms_this_type` feature (80% of model gain) is computed from the training partition at experiment time and passed as a frozen lookup to `LambdaRankScheduler`. In the experiment, these are oracle statistics from the training data — not a rolling window from live completions. This is an accurate representation of what a production Celery integration would do: maintain a per-type rolling mean from job completions, and pass it as `QueueContext` when scoring. The `chronoq-celery` integration wires this via `task_success` signals with a ring-buffer rolling mean, matching the experiment design.
 
 ### Non-preemptive SRPT
 
@@ -409,13 +409,13 @@ At very high queue load (ρ ≥ 0.8), aggressive SJF-type scheduling starves lon
 
 ### Multi-worker simulation
 
-The simulator supports `n_workers` via `simpy.Resource(capacity=n_workers)` — added in Wave 1 track B5. The `jct_vs_concurrency` experiment sweeps concurrency ∈ {1,2,4,8,16} at ρ=0.7. The JCT results above use `n_workers=1` (default); multi-worker results are in `bench/artifacts/jct_vs_concurrency.png`. At higher concurrency, HOL blocking decreases and the absolute JCT gap between LambdaRank and FCFS narrows, though the directional improvement persists.
+The simulator supports `n_workers` via `simpy.Resource(capacity=n_workers)`. The `jct_vs_concurrency` experiment sweeps concurrency ∈ {1,2,4,8,16} at ρ=0.7. The JCT results above use `n_workers=1` (default); multi-worker results are in `bench/artifacts/jct_vs_concurrency.png`. At higher concurrency, HOL blocking decreases and the absolute JCT gap between LambdaRank and FCFS narrows, though the directional improvement persists.
 
 ## Results — BurstGPT trace
 
 **Headline**: LambdaRank tracks the SJF-oracle upper bound within **5.1% at p99 @ load=0.7**
 on BurstGPT — i.e. the ranker is making near-optimal ordering decisions on a real LLM
-trace. The Chunk-2 gate targets (+10% mean, +15% p99 vs FCFS) were calibrated on the
+trace. The synthetic Pareto gate targets (+10% mean, +15% p99 vs FCFS) were calibrated on the
 synthetic Pareto trace whose short-to-long duration ratio is **56×**; BurstGPT's ratio is
 **11×**, which mechanically compresses the achievable improvement band. The comparison that
 actually measures model quality — ranker-vs-oracle — is on target. The FCFS-relative
