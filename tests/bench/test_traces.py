@@ -109,6 +109,23 @@ def test_burstgpt_name() -> None:
     assert BurstGPTLoader().name == "burstgpt"
 
 
+def test_burstgpt_loader_offline_sample_loads(monkeypatch) -> None:
+    """Validate that CHRONOQ_BENCH_OFFLINE=1 + BurstGPTLoader() returns a non-empty
+    list of TraceJob from the committed CI fixture at bench/fixtures/burstgpt_ci_sample.parquet.
+
+    This is the canonical offline gate: every CI run must exercise this path.
+    Later commits in this branch update the assertions for the multi-type binning.
+    """
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.burstgpt import BurstGPTLoader
+
+    jobs = BurstGPTLoader().load()
+    assert len(jobs) > 0, "BurstGPTLoader offline should return at least 1 job"
+    assert all(isinstance(j, TraceJob) for j in jobs)
+    assert all(j.true_ms > 0.0 for j in jobs)
+    assert all(j.payload_size > 0 for j in jobs)
+
+
 # ---------------------------------------------------------------------------
 # BorgLoader (offline mode only in CI)
 # ---------------------------------------------------------------------------
