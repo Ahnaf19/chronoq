@@ -107,3 +107,71 @@ def test_burstgpt_name() -> None:
     from chronoq_bench.traces.burstgpt import BurstGPTLoader
 
     assert BurstGPTLoader().name == "burstgpt"
+
+
+# ---------------------------------------------------------------------------
+# BorgLoader (offline mode only in CI)
+# ---------------------------------------------------------------------------
+
+
+def test_borg_loader_offline_sample_loads(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.borg import BorgLoader
+
+    loader = BorgLoader()
+    jobs = loader.load()
+    assert len(jobs) == 100
+    assert all(isinstance(j, TraceJob) for j in jobs)
+
+
+def test_borg_loader_offline_positive_durations(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.borg import BorgLoader
+
+    jobs = BorgLoader().load()
+    assert all(j.true_ms > 0.0 for j in jobs)
+
+
+def test_borg_loader_offline_load_n(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.borg import BorgLoader
+
+    jobs = BorgLoader().load(n=20)
+    assert len(jobs) == 20
+
+
+def test_borg_loader_name() -> None:
+    from chronoq_bench.traces.borg import BorgLoader
+
+    assert BorgLoader().name == "borg"
+
+
+def test_borg_loader_schema_validation(monkeypatch) -> None:
+    """Loader must raise ValueError when required columns are missing."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    import pandas as pd
+    import pytest
+    from chronoq_bench.traces.borg import BorgLoader
+
+    loader = BorgLoader()
+    # Patch _get_dataframe to return a frame missing required columns
+    bad_df = pd.DataFrame({"foo": [1, 2, 3]})
+    with pytest.raises(ValueError, match="missing required columns"):
+        loader._validate_schema(bad_df)
+
+
+def test_borg_loader_task_types_valid(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.borg import _SCHED_CLASS_TO_TYPE, BorgLoader
+
+    jobs = BorgLoader().load()
+    valid_types = set(_SCHED_CLASS_TO_TYPE.values()) | {f"sched_class_{i}" for i in range(10)}
+    assert all(j.task_type in valid_types for j in jobs)
+
+
+def test_borg_loader_payload_size_positive(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.borg import BorgLoader
+
+    jobs = BorgLoader().load()
+    assert all(j.payload_size >= 1 for j in jobs)
