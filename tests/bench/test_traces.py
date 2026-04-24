@@ -120,12 +120,12 @@ def test_burstgpt_loader_offline_sample_loads(monkeypatch) -> None:
     monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
     from chronoq_bench.traces.burstgpt import BurstGPTLoader
 
-    _VALID_TYPES = {"llm_short", "llm_medium", "llm_long"}
+    valid_types = {"llm_short", "llm_medium", "llm_long"}
     jobs = BurstGPTLoader().load()
     assert len(jobs) > 0, "BurstGPTLoader offline should return at least 1 job"
     assert all(isinstance(j, TraceJob) for j in jobs)
-    assert all(j.task_type in _VALID_TYPES for j in jobs), (
-        f"Unexpected task types: {set(j.task_type for j in jobs) - _VALID_TYPES}"
+    assert all(j.task_type in valid_types for j in jobs), (
+        f"Unexpected task types: {set(j.task_type for j in jobs) - valid_types}"
     )
     assert all(j.true_ms > 0.0 for j in jobs)
     assert all(j.payload_size > 0 for j in jobs)
