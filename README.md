@@ -122,4 +122,4 @@ See [`CHANGELOG.md`](CHANGELOG.md) for full release history.
 MIT. see [LICENSE](LICENSE).
 
 > [!TIP]
-> Contributions welcome. see [CONTRIBUTING](CONTRIBUTING) — issues for bug reports, PRs with tests for changes.
+> Contributions welcome. see [CONTRIBUTING](CONTRIBUTING.md) — issues for bug reports, PRs with tests for changes.
