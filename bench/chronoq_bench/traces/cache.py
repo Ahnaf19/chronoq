@@ -10,6 +10,7 @@ _BENCH_ROOT = Path(__file__).parent.parent.parent
 
 DATA_DIR = _BENCH_ROOT / "data"
 ARTIFACTS_DIR = _BENCH_ROOT / "artifacts"
+FIXTURES_DIR = _BENCH_ROOT / "fixtures"
 
 # BurstGPT paths
 CI_SAMPLE_PATH = _BENCH_ROOT / "fixtures" / "burstgpt_ci_sample.parquet"
@@ -23,6 +24,11 @@ BORG_CI_SAMPLE_PATH = _BENCH_ROOT / "fixtures" / "borg_ci_sample.parquet"
 BORG_GCS_SHARD_URL = (
     "https://storage.googleapis.com/clusterdata-2011-2/task_events/part-00000-of-00500.csv.gz"
 )
+
+# Azure Functions Trace 2019 paths (Azure Public Dataset, CC-BY 4.0)
+AZURE_DATA_DIR = DATA_DIR / "azure"
+AZURE_CACHE_PATH = DATA_DIR / "azure_sampled.parquet"
+AZURE_CI_SAMPLE_PATH = FIXTURES_DIR / "azure_ci_sample.parquet"
 
 
 def is_offline() -> bool:

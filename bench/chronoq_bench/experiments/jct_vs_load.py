@@ -581,7 +581,11 @@ def _build_loader(trace_name: str) -> TraceLoader | None:
         from chronoq_bench.traces.borg import BorgLoader
 
         return BorgLoader()
-    raise ValueError(f"Unknown trace '{trace_name}'. Choices: synthetic, burstgpt, borg")
+    if trace_name == "azure":
+        from chronoq_bench.traces.azure import AzureLoader
+
+        return AzureLoader()
+    raise ValueError(f"Unknown trace '{trace_name}'. Choices: synthetic, burstgpt, borg, azure")
 
 
 def main() -> None:
@@ -590,7 +594,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="JCT vs load benchmark sweep.")
     parser.add_argument(
         "--trace",
-        choices=["synthetic", "burstgpt", "borg"],
+        choices=["synthetic", "burstgpt", "borg", "azure"],
         default="synthetic",
         help="Trace loader to use (default: synthetic Pareto).",
     )
