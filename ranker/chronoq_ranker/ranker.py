@@ -174,47 +174,51 @@ class TaskRanker:
         except RuntimeError:
             pass  # No reference yet (first retrain); skip.
 
-        if total >= self._config.cold_start_threshold:
-            if isinstance(current_estimator, LambdaRankEstimator):
-                new_estimator = current_estimator  # incremental fit on same instance
-            else:
-                new_estimator = LambdaRankEstimator(
-                    config=self._config,
-                    feature_extractor=self._extractor,
-                )
-
-            try:
-                metrics = new_estimator.fit(records)
-            except InsufficientGroupsError:
-                if self._config.allow_degrade:
-                    logger.warning(
-                        "LambdaRank fit failed (insufficient groups); "
-                        "degrading to GradientEstimator."
-                    )
-                    new_estimator = GradientEstimator()
-                    metrics = new_estimator.fit(records)
+        try:
+            if total >= self._config.cold_start_threshold:
+                if isinstance(current_estimator, LambdaRankEstimator):
+                    new_estimator = current_estimator  # incremental fit on same instance
                 else:
-                    raise
-        else:
-            new_estimator = HeuristicEstimator()
-            metrics = new_estimator.fit(records)
+                    new_estimator = LambdaRankEstimator(
+                        config=self._config,
+                        feature_extractor=self._extractor,
+                    )
 
-        rejected = bool(metrics.get("_rejected", False))
-        promoted = new_estimator.model_type() != previous_type
+                try:
+                    metrics = new_estimator.fit(records)
+                except InsufficientGroupsError:
+                    if self._config.allow_degrade:
+                        logger.warning(
+                            "LambdaRank fit failed (insufficient groups); "
+                            "degrading to GradientEstimator."
+                        )
+                        new_estimator = GradientEstimator()
+                        metrics = new_estimator.fit(records)
+                    else:
+                        raise
+            else:
+                new_estimator = HeuristicEstimator()
+                metrics = new_estimator.fit(records)
 
-        with self._lock:
-            self._estimator = new_estimator
+            rejected = bool(metrics.get("_rejected", False))
+            promoted = new_estimator.model_type() != previous_type
 
-        self._last_retrain_at = datetime.now(UTC)
-        # Reset the monotonic counter after a retrain attempt completes,
-        # mirroring the prior datetime-cutoff semantics: count resumes at zero
-        # from this point forward regardless of whether the model was promoted
-        # or rejected.
-        self._records_since_last_retrain = 0
+            with self._lock:
+                self._estimator = new_estimator
 
-        # Update drift reference after a successful lambdarank fit (not rejected).
-        if isinstance(new_estimator, LambdaRankEstimator) and not rejected:
-            self._drift_detector.set_reference(records)
+            # Update drift reference after a successful lambdarank fit (not rejected).
+            if isinstance(new_estimator, LambdaRankEstimator) and not rejected:
+                self._drift_detector.set_reference(records)
+        finally:
+            # Always advance _last_retrain_at and reset the auto-retrain counter,
+            # even if the fit raised. Without this, a fit that raises (e.g.
+            # InsufficientGroupsError with allow_degrade=False, or a LightGBM
+            # internal error) leaves the counter at its threshold value, so the
+            # very next record() re-triggers retrain() against the same failing
+            # dataset — a runaway hot-loop. The finally branch guarantees the
+            # counter resets on every retrain attempt.
+            self._last_retrain_at = datetime.now(UTC)
+            self._records_since_last_retrain = 0
 
         logger.info(
             "Retrain complete: model={}, version={}, promoted={}, rejected={}",
