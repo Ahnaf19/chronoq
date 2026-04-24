@@ -1,16 +1,24 @@
 # tests
 
-244 tests: 119 ranker (`tests/ranker/`) + 24 demo-server (`tests/server/`) + 63 bench (`tests/bench/`) + 38 celery (`tests/celery/`). No external services required. Counts updated post v0.2.0 sprint Wave 1 — see `CHANGELOG.md`/`docs/v2/BENCHMARKS.md` for the tracks that added tests.
+All tests run locally with no external services required.
+
+## Current count
+
+Run `uv run pytest --collect-only -q | tail -1` for the current total.
+Per-directory counts drift under sprint work; don't hard-code them here or in
+other CLAUDE.md files — agents and contributors should re-query when needed.
+
+Per-release totals are recorded in `CHANGELOG.md` at tag time.
 
 ## Layout
 
 ```
 tests/
-├── conftest.py              # Shared fixtures: memory_store, predictor_config (low thresholds)
-├── ranker/                  # 119 — schemas, config, storage, features, heuristic, gradient, orchestrator, integration, compat shims, predict_scores, lambdarank, oracle, drift, hypothesis, retrain_trigger, retrain_trigger_precision
-├── server/                  # 24 — queue, scheduler, worker, api/*, integration
-├── bench/                   # 63 — test_metrics (17), test_traces (14), test_simulator (17), test_baselines (5), test_experiments (8), test_plots (1), test_stub (1)
-└── celery/                  # 38 — test_rolling (9), test_scheduler (19), test_signals (4), test_examples (5), test_stub (1)
+├── conftest.py              # shared fixtures
+├── ranker/                  # schemas, config, storage, features, models, drift, hypothesis, retrain_trigger
+├── server/                  # demo-server queue, scheduler, worker, api
+├── bench/                   # metrics, traces, simulator, baselines, experiments, plots
+└── celery/                  # rolling, scheduler, signals, examples
 ```
 
 ## Conventions
@@ -24,11 +32,11 @@ tests/
 ## Run
 
 ```bash
-uv run pytest -v                           # All 244
-uv run pytest tests/ranker/ -v             # Ranker only (119)
-uv run pytest tests/server/ -v             # Demo-server only (24)
-uv run pytest tests/bench/ -v             # Bench only (63)
-uv run pytest tests/celery/ -v             # Celery only (38)
+uv run pytest -v                           # All tests
+uv run pytest tests/ranker/ -v             # Ranker only
+uv run pytest tests/server/ -v             # Demo-server only
+uv run pytest tests/bench/ -v             # Bench only
+uv run pytest tests/celery/ -v             # Celery only
 uv run pytest -k "lambdarank" -v           # LambdaRank tests only
 uv run pytest -k "hypothesis" -v          # Property tests only
 uv run pytest --cov=chronoq_ranker --cov=chronoq_celery --cov-report=term-missing
@@ -40,4 +48,4 @@ uv run pytest --cov=chronoq_ranker --cov=chronoq_celery --cov-report=term-missin
 - Use `memory_store` and `predictor_config` fixtures from `conftest.py` (the fixture is still named `predictor_config` for backward compat; returns a `RankerConfig` — rename deferred to the next major bump).
 - Server tests: create `FakeRedis` + `TaskQueue` per-test or via fixture, not module-level.
 - Keep fast: mock `simulate_task`, use `memory://`, use low thresholds.
-- Chunk 1+: `hypothesis` property tests live in `tests/ranker/test_lambdarank_hypothesis.py` (8 tests covering rank-label monotonicity, ρ range, pairwise accuracy range, PSI non-negativity).
+- `hypothesis` property tests live in `tests/ranker/test_lambdarank_hypothesis.py` (rank-label monotonicity, ρ range, pairwise accuracy range, PSI non-negativity).
