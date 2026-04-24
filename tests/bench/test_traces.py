@@ -211,3 +211,78 @@ def test_borg_loader_payload_size_positive(monkeypatch) -> None:
 
     jobs = BorgLoader().load()
     assert all(j.payload_size >= 1 for j in jobs)
+
+
+# ---------------------------------------------------------------------------
+# AzureLoader (offline mode only in CI)
+# ---------------------------------------------------------------------------
+
+
+def test_azure_loader_offline_sample_loads(monkeypatch) -> None:
+    """Committed CI fixture loads cleanly and returns exactly 100 TraceJobs."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.azure import AzureLoader
+
+    loader = AzureLoader()
+    jobs = loader.load()
+    assert len(jobs) == 100
+    assert all(isinstance(j, TraceJob) for j in jobs)
+
+
+def test_azure_loader_offline_positive_durations(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.azure import AzureLoader
+
+    jobs = AzureLoader().load()
+    assert all(j.true_ms > 0.0 for j in jobs)
+
+
+def test_azure_loader_offline_load_n(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.azure import AzureLoader
+
+    jobs = AzureLoader().load(n=20)
+    assert len(jobs) == 20
+
+
+def test_azure_loader_name() -> None:
+    from chronoq_bench.traces.azure import AzureLoader
+
+    assert AzureLoader().name == "azure"
+
+
+def test_azure_loader_schema_validation(monkeypatch) -> None:
+    """Loader raises ValueError when required columns are missing from cache."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    import pandas as pd
+    import pytest
+    from chronoq_bench.traces.azure import AzureLoader
+
+    loader = AzureLoader()
+    bad_df = pd.DataFrame({"foo": [1, 2, 3]})
+    with pytest.raises(ValueError, match="missing required columns"):
+        loader._validate_schema(bad_df)
+
+
+def test_azure_loader_trigger_in_metadata(monkeypatch) -> None:
+    """Each TraceJob must carry its trigger type in metadata."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.azure import AzureLoader
+
+    jobs = AzureLoader().load()
+    assert all("trigger" in j.metadata for j in jobs)
+    valid_triggers = {"http", "timer", "queue", "event", "storage", "orchestration", "others"}
+    assert all(j.metadata["trigger"] in valid_triggers for j in jobs)
+
+
+def test_azure_loader_multi_type_diversity(monkeypatch) -> None:
+    """Azure CI sample must contain multiple unique task_types (serverless functions)."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.azure import AzureLoader
+
+    jobs = AzureLoader().load()
+    unique_types = {j.task_type for j in jobs}
+    # Azure has thousands of HashFunction values; even 100 rows should have many types
+    assert len(unique_types) >= 10, (
+        f"Expected >=10 unique task_types in Azure CI fixture, got {len(unique_types)}"
+    )
