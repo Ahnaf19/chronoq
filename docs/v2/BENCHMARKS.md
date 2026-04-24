@@ -39,7 +39,13 @@ size-correlated duration: `true_ms = lognormal(mu_type + log1p(payload_kb)*0.3, 
 Arrivals follow a Poisson process; load ρ is controlled by scaling inter-arrival times.
 
 **Why this trace**: Known heavy-tail structure guarantees LambdaRank has signal to exploit.
-Reproducible to ±2% across machines (seed=42).
+
+**Cross-platform reproducibility**: validated on macOS (Apple Silicon, Python 3.11) and
+Windows (Ryzen 5 3600, Python 3.11.13). At the same `main` commit, `bench/artifacts/results.json`
+is **byte-identical** across platforms after LF line-ending normalization —
+SHA-256: `e101be378784e75b48b01e2818011f22c03828e2eb3c83cd0a48da80858119b6`. Every
+per-seed metric and every median aggregate matches. Any future divergence from these
+medians is a reproducibility regression worth bisecting.
 
 ### BurstGPT (Chunk 3+)
 
