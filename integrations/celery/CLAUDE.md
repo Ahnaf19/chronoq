@@ -4,7 +4,10 @@ Celery integration for `chronoq-ranker`. Ships `LearnedScheduler` — a pre-brok
 with `fifo` / `shadow` / `active` modes that routes tasks in predicted-duration order
 without touching the Celery broker.
 
-**Status:** Chunk 3 complete on `v2/chunk-3-celery`.
+**Status:** Shipped. `LearnedScheduler`, `TypeStatsTracker`, `attach_signals` in production-ready
+state. Examples: `examples/toggle_demo.py` (eager-mode A/B, no Docker) and
+`examples/celery-docker/` (Docker Compose A/B stack with Redis + worker + producer).
+All v0.2.0 Windows unicode fixes applied.
 
 ## Why pre-broker gate?
 
@@ -22,6 +25,10 @@ chronoq_celery/
 ├── scheduler.py        # LearnedScheduler — fifo/shadow/active + heap dispatch
 └── signals.py          # attach_signals() — task_prerun/task_success/task_failure wiring
 demo.py                 # 200-task Pareto JCT comparison; no chronoq_bench import
+examples/
+├── toggle_demo.py      # eager-mode A/B demo (CHRONOQ_MODE=fifo|active, no Docker)
+├── celery-docker/      # Docker Compose A/B stack (redis + worker + producer + plot)
+└── README.md           # run instructions and caveats
 ```
 
 ## Modes
@@ -51,9 +58,9 @@ features = extractor.extract(candidate, context=ctx)
 score = estimator.predict_batch([features])[0][0]
 ```
 
-`recent_mean_ms_this_type` carries ~80% of ranking signal (from Chunk 2 ablation).
+`recent_mean_ms_this_type` carries ~80% of ranking signal (from ablation experiment).
 
-## Chunk 3 handoff context
+## Handoff context
 
 - `task_success` → `record_completion()` → `TypeStatsTracker.record()` + `ranker.record()` → `dispatch_next()`
 - `task_prerun` → `record_start()` writes `start_ms = time.monotonic() * 1000`
@@ -64,11 +71,11 @@ score = estimator.predict_batch([features])[0][0]
 ## Testing
 
 ```bash
-uv run pytest tests/celery/ -v   # 32 tests (rolling=9, scheduler=19, signals=4)
+uv run pytest tests/celery/ -v
 ```
 
 No Docker, no real Redis, no real broker. Scheduler tests use fresh in-memory rankers.
-Signal tests use mocks. All 32 tests pass with no external services.
+Signal tests use mocks. All tests pass with no external services.
 
 ## Rules
 

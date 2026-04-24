@@ -12,8 +12,8 @@ docs/
     ├── README.md       # v2 landing page + chunk status
     ├── architecture.md # system design, v1→v2 component map, key interfaces
     ├── tech-stack.md   # dependencies, versions, rationale, paid-tier path
-    ├── BENCHMARKS.md   # (Chunk 2+) reproduction steps, trace sources, baselines
-    ├── INTEGRATIONS.md # (Chunk 3+) Celery quickstart, Hatchet sidecar design
+    ├── BENCHMARKS.md   # reproduction steps, trace sources, baselines
+    ├── INTEGRATIONS.md # Celery quickstart, Hatchet sidecar design
     └── internal/       # ⚠️ gitignored — BRD, PRD, milestones, risks, claude-team
                         #    Project owner's planning docs. Not shipped to OSS consumers.
 ```
@@ -24,8 +24,8 @@ docs/
 |---|---|
 | How does Chronoq work? | [`v2/architecture.md`](v2/architecture.md) |
 | What dependencies, versions, why? | [`v2/tech-stack.md`](v2/tech-stack.md) |
-| How do I reproduce the benchmark? | `v2/BENCHMARKS.md` (Chunk 2+) |
-| How do I integrate with Celery? | `v2/INTEGRATIONS.md` (Chunk 3+) |
+| How do I reproduce the benchmark? | `v2/BENCHMARKS.md` |
+| How do I integrate with Celery? | `v2/INTEGRATIONS.md` |
 | What was v1? | [`v1/`](v1/) — mentally translate `chronoq_predictor` → `chronoq_ranker` |
 
 ## Freshness convention
@@ -48,4 +48,4 @@ Rule for Claude / contributors: **`docs-writer` agent runs `/sync-docs` after ev
 - The project owner's planning
 - Subagents (`product-manager`, `project-manager`, `library-architect`) that read them as source of truth
 
-The canonical source for internal docs is the plan file at `~/.claude/plans/ok-i-want-golden-knuth.md`. `v2/internal/*.md` are extracts; keep in sync via `/claude-audit` or `/sync-docs`.
+Canonical plan sources: `~/.claude/plans/ok-i-want-golden-knuth.md` (Chunks 0-4 long-term) and `~/.claude/plans/eager-puzzling-cherny.md` (v0.2.0 publish sprint). `v2/internal/*.md` are extracts; keep in sync via `/claude-audit` or `/sync-docs`.
