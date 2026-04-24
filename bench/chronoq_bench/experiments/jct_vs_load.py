@@ -440,8 +440,9 @@ def _plot(data: dict[str, Any], out_path: Path) -> None:
     band_note = f"n={n_seeds} seeds, ±1σ band" if n_seeds > 1 else f"n={n_seeds} seed"
     axes[0].set_title(f"Mean JCT vs Load ({band_note})")
     axes[1].set_title(f"p99 JCT vs Load ({band_note})")
+    trace_label = data.get("trace", "synthetic").replace("_", " ").title()
     fig.suptitle(
-        "chronoq-ranker: LambdaRank vs Baselines (Synthetic Trace)",
+        f"chronoq-ranker: LambdaRank vs Baselines ({trace_label} Trace)",
         fontsize=12,
         fontweight="bold",
     )
@@ -565,15 +566,46 @@ def _print_criteria(data: dict[str, Any]) -> None:
         )
 
 
+def _build_loader(trace_name: str) -> TraceLoader | None:
+    """Resolve a trace name to a TraceLoader instance.
+
+    Returns None for "synthetic" (caller uses per-seed fresh loaders).
+    """
+    if trace_name == "synthetic":
+        return None
+    if trace_name == "burstgpt":
+        from chronoq_bench.traces.burstgpt import BurstGPTLoader
+
+        return BurstGPTLoader()
+    if trace_name == "borg":
+        from chronoq_bench.traces.borg import BorgLoader
+
+        return BorgLoader()
+    raise ValueError(f"Unknown trace '{trace_name}'. Choices: synthetic, burstgpt, borg")
+
+
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="JCT vs load benchmark sweep.")
+    parser.add_argument(
+        "--trace",
+        choices=["synthetic", "burstgpt", "borg"],
+        default="synthetic",
+        help="Trace loader to use (default: synthetic Pareto).",
+    )
+    args = parser.parse_args()
+
     smoke = os.getenv("CHRONOQ_BENCH_SMOKE") == "1"
     n_train = 200 if smoke else _N_TRAIN
     n_eval = 100 if smoke else _N_EVAL
     load_pts = [0.5, 0.7] if smoke else _LOAD_POINTS
     seeds = [_SEED] if smoke else _DEFAULT_SEEDS
 
+    loader = _build_loader(args.trace)
+
     print(
-        f"jct_vs_load: n_train={n_train}, n_eval={n_eval}, "
+        f"jct_vs_load: trace={args.trace}, n_train={n_train}, n_eval={n_eval}, "
         f"load_points={load_pts}, n_seeds={len(seeds)}"
     )
     data = run_experiment(
@@ -581,14 +613,16 @@ def main() -> None:
         n_eval=n_eval,
         load_points=load_pts,
         seeds=seeds,
+        loader=loader,
     )
 
+    trace_suffix = "" if args.trace == "synthetic" else f"_{args.trace}"
     artifacts = ensure_artifacts_dir()
-    results_path = artifacts / "results.json"
+    results_path = artifacts / f"results{trace_suffix}.json"
     results_path.write_text(json.dumps(data, indent=2))
     print(f"Wrote {results_path}")
 
-    _plot(data, artifacts / "jct_vs_load.png")
+    _plot(data, artifacts / f"jct_vs_load{trace_suffix}.png")
     _print_criteria(data)
 
 
