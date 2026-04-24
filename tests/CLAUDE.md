@@ -7,10 +7,10 @@
 ```
 tests/
 ├── conftest.py              # Shared fixtures: memory_store, predictor_config (low thresholds)
-├── ranker/                  # 113 — schemas, config, storage, features, heuristic, gradient, orchestrator, integration, compat shims, predict_scores, lambdarank, oracle, drift, hypothesis
+├── ranker/                  # 119 — schemas, config, storage, features, heuristic, gradient, orchestrator, integration, compat shims, predict_scores, lambdarank, oracle, drift, hypothesis, retrain_trigger, retrain_trigger_precision
 ├── server/                  # 24 — queue, scheduler, worker, api/*, integration
-├── bench/                   # 49 — test_metrics (17), test_traces (14), test_simulator (12), test_baselines (5), test_stub (1)
-└── celery/                  # 32 — test_rolling (9), test_scheduler (19), test_signals (4), test_stub (1)
+├── bench/                   # 63 — test_metrics (17), test_traces (14), test_simulator (17), test_baselines (5), test_experiments (8), test_plots (1), test_stub (1)
+└── celery/                  # 38 — test_rolling (9), test_scheduler (19), test_signals (4), test_examples (5), test_stub (1)
 ```
 
 ## Conventions
@@ -24,11 +24,11 @@ tests/
 ## Run
 
 ```bash
-uv run pytest -v                           # All 216
-uv run pytest tests/ranker/ -v             # Ranker only (113)
+uv run pytest -v                           # All 244
+uv run pytest tests/ranker/ -v             # Ranker only (119)
 uv run pytest tests/server/ -v             # Demo-server only (24)
-uv run pytest tests/bench/ -v             # Bench only (49)
-uv run pytest tests/celery/ -v             # Celery only (32)
+uv run pytest tests/bench/ -v             # Bench only (63)
+uv run pytest tests/celery/ -v             # Celery only (38)
 uv run pytest -k "lambdarank" -v           # LambdaRank tests only
 uv run pytest -k "hypothesis" -v          # Property tests only
 uv run pytest --cov=chronoq_ranker --cov=chronoq_celery --cov-report=term-missing
