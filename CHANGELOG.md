@@ -2,22 +2,46 @@
 
 All notable changes to Chronoq. Format based on [Keep a Changelog](https://keepachangelog.com/). Per-package versioning follows semver; external docs use `v0.X.Y` only.
 
-## [Unreleased] — targets v0.2.0
+## [Unreleased]
+
+_Nothing yet. Wave 2.5 (→ v0.2.1): three more real traces — Philly DL-training, Helios multi-tenant GPU, Mooncake cross-provider LLM._
+
+## [0.2.0] — 2026-04-24
+
+First PyPI release. Library-first pivot complete: `chronoq-ranker`, `chronoq-bench`, and `chronoq-celery` ship as installable packages; the v1 FastAPI+Redis server stays demoted in `demo-server/` as a reference integration. Validated on 4 workload traces (synthetic Pareto plus 3 public real-world traces). Byte-identical cross-platform reproducibility between macOS (Apple Silicon) and Windows (x86_64).
 
 ### Added
-- **chronoq-bench**: multi-seed error bands (B1 #6), multi-worker simulator + `jct_vs_concurrency` experiment (B5 #7), ablation + drift plots surfaced in README and BENCHMARKS.md (B6 #8)
-- **chronoq-celery**: eager-mode `toggle_demo.py` (A1 #9), Docker Compose A/B demo stack (A2 #10)
-- **chronoq-bench**: Google Borg 2011 trace loader (#17), BurstGPT trace loader + multi-type binning (#19), Azure Functions 2019 trace loader (#18)
-- **docs**: cross-platform reproducibility (byte-identical SHA-256 macOS + Windows, #14); docs sync before v0.2.0 sprint (#16)
+- **chronoq-bench**: multi-seed error bands on the hero plot (B1 #6), multi-worker simulator + `jct_vs_concurrency` experiment (B5 #7), ablation + drift-recovery plots surfaced in README and BENCHMARKS.md (B6 #8).
+- **chronoq-celery**: eager-mode `toggle_demo.py` running the real Celery API with `task_always_eager=True` (A1 #9); Docker Compose A/B demo stack with real Redis + worker + producer + JCT measurement (A2 #10).
+- **chronoq-bench (real-trace loaders)**: Google Borg 2011 via public GCS (`gs://clusterdata-2011-2`, no auth, CC-BY 4.0) (#17); BurstGPT real LLM-inference trace from HuggingFace `lzzmm/BurstGPT` with multi-type binning (#19); Azure Functions 2019 serverless trace from `Azure/AzurePublicDataset` (#18).
+- **commands**: `.claude/commands/integration-test.md` (end-to-end Celery smoke check); `.claude/commands/release.md` (release-PR orchestration).
+- **docs**: eye-catching hero README (PR #20 + follow-up formatting fix `104f18a`); cross-platform reproducibility note with committed SHA-256 (#14); internal semver policy at `docs/v2/internal/versioning.md`; v0.2.0 release checklist at `docs/v2/internal/release-pr-checklist.md`.
 
 ### Fixed
-- **chronoq-celery**: ASCII output in `toggle_demo` for Windows cp1252 subprocess (#11)
-- **chronoq-ranker**: monotonic counter replaces datetime-based `count_since` for auto-retrain trigger, avoiding Windows 15ms tick precision (#12)
-- **chronoq-ranker**: `LambdaRankEstimator.version()` uses per-instance counter suffix (#13); test sleep past Windows tick in `test_count_since_resets_after_retrain`
-- **chronoq-ranker**: `TaskRanker.retrain()` wraps state updates in `try/finally` (#15) — auto-retrain counter resets even on fit failure
+- **chronoq-celery**: ASCII output in `toggle_demo.py` for Windows cp1252 subprocess encoding (#11).
+- **chronoq-ranker**: monotonic in-process counter on `TaskRanker._records_since_last_retrain` replaces datetime-based `count_since` for the auto-retrain trigger, avoiding Windows `GetSystemTimeAsFileTime` ~15 ms tick collisions (#12).
+- **chronoq-ranker**: `LambdaRankEstimator.version()` uses a per-instance counter suffix so rapid incremental fits within one second produce unique version strings (#13); companion test-sleep past the Windows tick in `test_count_since_resets_after_retrain`.
+- **chronoq-ranker**: `TaskRanker.retrain()` wraps `_last_retrain_at` + counter-reset state updates in `try/finally` so a fit that raises no longer leaves the auto-retrain gate stuck at threshold (#15).
 
 ### Changed
-- Semver policy adopted (`docs/v2/internal/versioning.md`); "Wave" vocabulary dropped from external docs
+- **Semver policy adopted** (`docs/v2/internal/versioning.md`): external-facing docs (README, CHANGELOG, `docs/v2/*`, PyPI, LinkedIn) now use `vX.Y.Z` only. "Wave" and "Chunk" vocabulary retained exclusively in internal sprint-planning files.
+- **Docs sweep** (#20): test-count tracking consolidated into `tests/CLAUDE.md` only (stops the drift-tax across CLAUDE.md + README); `docs/v2/README.md` chunk-status table replaced with release-milestone table; CHANGELOG reorganised per Keep a Changelog; root `CLAUDE.md` phase line refreshed.
+- **Docs formatting** (`57b2888`): unwrapped hard-wrapped prose paragraphs in `docs/v2/BENCHMARKS.md` and `docs/v2/INTEGRATIONS.md` so GitHub web, PR descriptions, and PDF renderers produce continuous paragraphs rather than mid-sentence breaks.
+
+### Deprecated
+- None.
+
+### Removed
+- None.
+
+### Security
+- None.
+
+### Known limitations (not blockers; publicly documented)
+- **p99 starvation at ρ ≥ 0.8**: SJF-family tradeoff — short-first bias indefinitely delays long jobs at the tail. Pair with aging in production. An aging-aware scheduler is planned for v0.3.0.
+- **Workload-dependent wins**: on traces where SJF-oracle can't improve p99 (narrow duration variance, single task-type), the ranker also can't. The benchmark harness surfaces this as a diagnostic, not a defect — see the Azure Functions result in BENCHMARKS.md.
+- **Pre-1.0 API**: breaking changes allowed in minor-version bumps under the project's semver policy, with one-minor deprecation shims and a CHANGELOG "Breaking" entry.
+- **`TelemetryStore.count_since(after: datetime)`** may undercount on systems with coarse clock resolution (Windows 15 ms tick); auto-retrain no longer depends on it, so the impact is limited to introspection. A sequence-number-based replacement is planned for v0.3.0.
 
 ---
 
