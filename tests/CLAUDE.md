@@ -1,6 +1,6 @@
 # tests
 
-225 tests: 120 ranker (`tests/ranker/`) + 24 demo-server (`tests/server/`) + 49 bench (`tests/bench/`) + 32 celery (`tests/celery/`). No external services required.
+244 tests: 119 ranker (`tests/ranker/`) + 24 demo-server (`tests/server/`) + 63 bench (`tests/bench/`) + 38 celery (`tests/celery/`). No external services required. Counts updated post v0.2.0 sprint Wave 1 — see `CHANGELOG.md`/`docs/v2/BENCHMARKS.md` for the tracks that added tests.
 
 ## Layout
 
