@@ -6,6 +6,16 @@ All notable changes to Chronoq. Format based on [Keep a Changelog](https://keepa
 
 _Nothing yet. Wave 2.5 (→ v0.2.1): three more real traces — Philly DL-training, Helios multi-tenant GPU, Mooncake cross-provider LLM._
 
+## [0.2.0.post1] — 2026-04-24
+
+Metadata-only post-release. Same code as `0.2.0` — no behavioral change.
+
+### Changed
+- `chronoq-ranker`: rewrote `ranker/README.md` (the source for the PyPI project description). Previous README referenced pre-0.2.0 sprint-internal vocabulary ("Chunk 1 W3 lands"); replaced with accurate post-0.2.0 content — pip install, LambdaRank-is-shipped, 4-trace evidence link, honest limitations.
+- `chronoq-celery`: added `integrations/celery/README.md` (new — PyPI previously showed "the author has not provided a project description"). Covers 30-second install + 3-mode table + shadow→active rollout pattern.
+
+---
+
 ## [0.2.0] — 2026-04-24
 
 First PyPI release. Library-first pivot complete: `chronoq-ranker`, `chronoq-bench`, and `chronoq-celery` ship as installable packages; the v1 FastAPI+Redis server stays demoted in `demo-server/` as a reference integration. Validated on 4 workload traces (synthetic Pareto plus 3 public real-world traces). Byte-identical cross-platform reproducibility between macOS (Apple Silicon) and Windows (x86_64).
