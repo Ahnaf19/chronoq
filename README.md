@@ -5,9 +5,9 @@
 ![CI](https://github.com/Ahnaf19/chronoq/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
-![Status](https://img.shields.io/badge/status-Chunks%200–4%20complete%20·%20PyPI--ready-brightgreen?style=flat-square)
+![Status](https://img.shields.io/badge/status-Wave%201%20merged%20·%20Wave%202%20pending-blue?style=flat-square)
 
-> **Chunks 0–4 complete · PyPI-ready.** `chronoq-ranker` (LightGBM LambdaRank, 15 features), `chronoq-bench` (SimPy simulator, 5 baselines, +32% mean JCT vs FCFS @ load=0.7), and `chronoq-celery` (Celery plugin, +55% mean JCT vs FIFO) are built, tested, and packaged. See [`docs/v2/`](docs/v2/) for design, benchmark results, and integration guide.
+> **Chunks 0–4 complete · v0.2.0 sprint Wave 1 merged.** `chronoq-ranker` (LightGBM LambdaRank, 15 features), `chronoq-bench` (SimPy simulator, 5 baselines, multi-seed + multi-worker experiments), and `chronoq-celery` (Celery plugin, eager demo + Docker A/B stack) are built, tested, and packaged. 244 tests. Wave 2 (real-trace loaders: BurstGPT, Azure, Borg) is next. See [`docs/v2/`](docs/v2/) for design, benchmark results, and integration guide.
 
 ---
 
@@ -63,6 +63,8 @@ chronoq/
 | 2 — `chronoq-bench` | ✅ complete | `make bench` — **+32% mean JCT, +17.5% p99 vs FCFS** @ load=0.7 |
 | 3 — `chronoq-celery` | ✅ complete | `LearnedScheduler` (shadow/active/fifo), +55% mean JCT vs FIFO — 216 tests |
 | 4 — Polish + promo | ✅ complete | Bug fixes, `RankerConfig` hyperparams, drift wiring, PyPI metadata, 225 tests |
+| v0.2.0 Wave 1 | ✅ merged | Multi-seed bench, multi-worker sim, ablation plots, eager + Docker demos, Windows hotfixes — **244 tests** |
+| v0.2.0 Wave 2 | ⏳ pending | Real-trace loaders (BurstGPT, Azure Functions, Google Borg) |
 
 Full milestone detail: [`docs/v2/README.md`](docs/v2/README.md).
 
@@ -74,7 +76,7 @@ Full milestone detail: [`docs/v2/README.md`](docs/v2/README.md).
 git clone https://github.com/Ahnaf19/chronoq.git
 cd chronoq
 uv sync
-uv run pytest -v                # 225 tests
+uv run pytest -v                # 244 tests
 ```
 
 **Run the benchmark** (Chunk 2 — produces the money plot):

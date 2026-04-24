@@ -1,8 +1,8 @@
 ---
 status: current
 last-synced-to-plan: 2026-04-24
-last-synced-to-code: v2/chunk-2-bench
-source: "plan §2 Chunk 2 + track B6"
+last-synced-to-code: "v0.2.0-dev @ b331719 (Wave 1 merged)"
+source: "plan §2 Chunk 2 + sprint tracks B1/B5/B6"
 ---
 
 # Benchmarks
@@ -47,7 +47,7 @@ SHA-256: `e101be378784e75b48b01e2818011f22c03828e2eb3c83cd0a48da80858119b6`. Eve
 per-seed metric and every median aggregate matches. Any future divergence from these
 medians is a reproducibility regression worth bisecting.
 
-### BurstGPT (Chunk 3+)
+### BurstGPT (Wave 2 — pending)
 
 LLM inference request trace with ~500:1 short:long duration ratio. Download:
 ```bash
@@ -119,7 +119,7 @@ The drift experiment (`bench/chronoq_bench/experiments/drift_recovery.py`) train
 
 The target of ≥15% p99 improvement at load=0.5 requires **BurstGPT's extreme variance** (500:1 short:long ratio). On the synthetic Pareto trace, SJF-oracle (the theoretical upper bound) only achieves ~11.6% p99 improvement at load=0.5. LambdaRank p99 at load=0.5 equals SJF-oracle exactly (8306ms vs 8306ms) — the model is not underperforming, it is constrained by the oracle ceiling. The ≥15% target at load=0.5 is physically unreachable on this trace.
 
-**This will be revisited with BurstGPT in a future chunk.**
+**This will be revisited with BurstGPT in v0.2.0 Wave 2 (track B2).**
 
 ### Training statistics at inference time
 
@@ -133,6 +133,6 @@ The `recent_mean_ms_this_type` feature (80% of model gain) is computed from the 
 
 At very high queue load (ρ ≥ 0.8), aggressive SJF-type scheduling starves long jobs. Even SJF-oracle p99 degrades at ρ=0.9. This is a known property of preemptionless SJF scheduling and not specific to LambdaRank. In production, pair with aging or SRPT-with-aging to bound worst-case latency.
 
-### Single-server simulation
+### Multi-worker simulation
 
-The simulator models a single-server queue (one worker). Multi-worker parallelism (common in Celery with concurrency ≥ 4) reduces HOL blocking — the improvements will be directionally similar but smaller in absolute terms.
+The simulator supports `n_workers` via `simpy.Resource(capacity=n_workers)` — added in Wave 1 track B5. The `jct_vs_concurrency` experiment sweeps concurrency ∈ {1,2,4,8,16} at ρ=0.7. The JCT results above use `n_workers=1` (default); multi-worker results are in `bench/artifacts/jct_vs_concurrency.png`. At higher concurrency, HOL blocking decreases and the absolute JCT gap between LambdaRank and FCFS narrows, though the directional improvement persists.
