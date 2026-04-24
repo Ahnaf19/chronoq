@@ -585,9 +585,7 @@ def _build_loader(trace_name: str) -> TraceLoader | None:
         from chronoq_bench.traces.azure import AzureLoader
 
         return AzureLoader()
-    raise ValueError(
-        f"Unknown trace '{trace_name}'. Choices: synthetic, burstgpt, borg, azure"
-    )
+    raise ValueError(f"Unknown trace '{trace_name}'. Choices: synthetic, burstgpt, borg, azure")
 
 
 def main() -> None:
