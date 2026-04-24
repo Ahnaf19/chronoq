@@ -1,92 +1,23 @@
 # Changelog
 
-All notable changes to Chronoq. Format loosely based on [Keep a Changelog](https://keepachangelog.com/); versioning per-package once PyPI releases begin (Chunk 4).
+All notable changes to Chronoq. Format based on [Keep a Changelog](https://keepachangelog.com/). Per-package versioning follows semver; external docs use `v0.X.Y` only.
 
-## [Unreleased] — v0.2.0 sprint in progress
+## [Unreleased] — targets v0.2.0
 
-v0.2.0 is not yet released. Wave 1 is merged on `main`. Wave 2 (real-trace loaders:
-BurstGPT, Azure Functions, Google Borg) is pending. A release PR will cut the `v0.2.0`
-tag and bump pyproject versions once Wave 2 lands and the end-of-sprint gate passes.
+### Added
+- **chronoq-bench**: multi-seed error bands (B1 #6), multi-worker simulator + `jct_vs_concurrency` experiment (B5 #7), ablation + drift plots surfaced in README and BENCHMARKS.md (B6 #8)
+- **chronoq-celery**: eager-mode `toggle_demo.py` (A1 #9), Docker Compose A/B demo stack (A2 #10)
+- **chronoq-bench**: Google Borg 2011 trace loader (#17), BurstGPT trace loader + multi-type binning (#19), Azure Functions 2019 trace loader (#18)
+- **docs**: cross-platform reproducibility (byte-identical SHA-256 macOS + Windows, #14); docs sync before v0.2.0 sprint (#16)
 
-### Wave 2 — real-trace loaders (pending)
+### Fixed
+- **chronoq-celery**: ASCII output in `toggle_demo` for Windows cp1252 subprocess (#11)
+- **chronoq-ranker**: monotonic counter replaces datetime-based `count_since` for auto-retrain trigger, avoiding Windows 15ms tick precision (#12)
+- **chronoq-ranker**: `LambdaRankEstimator.version()` uses per-instance counter suffix (#13); test sleep past Windows tick in `test_count_since_resets_after_retrain`
+- **chronoq-ranker**: `TaskRanker.retrain()` wraps state updates in `try/finally` (#15) — auto-retrain counter resets even on fit failure
 
-- B2: BurstGPT LLM inference trace — loader, CI fixture, `results_burstgpt.json`, p99@0.5 gate
-- B3: Azure Functions trace — loader, CI fixture, `results_azure.json`
-- B4: Google Borg trace (or escape hatch: two real traces if Borg auth blocks) — `results_borg.json`
-
-### Wave 1 + Windows remediation (merged 2026-04-24)
-
-#### chronoq-bench
-
-- **B1 (#6):** `run_experiment` refactored to accept a `TraceLoader` (loader-agnostic sweep).
-  Seed parameter added; `jct_vs_load.py` sweeps `seeds: list[int]` and stores per-seed metric
-  arrays. `plot_with_band(xs, ys_per_seed, ...)` helper added to `bench/chronoq_bench/plots/base.py`
-  for shaded error bands in the hero plot. New test files: `tests/bench/test_experiments.py`
-  and `tests/bench/test_plots.py`. Reproducibility regression-tested via SHA-256 check.
-
-- **B5 (#7):** `Simulator` gains an `n_workers: int = 1` parameter backed by
-  `simpy.Resource(capacity=n_workers)`. New experiment `jct_vs_concurrency.py` sweeps
-  concurrency ∈ {1,2,4,8,16} at fixed ρ=0.7 with FCFS and LambdaRank schedulers.
-  Default `n_workers=1` is fully backward-compatible. `bench/CLAUDE.md` updated with
-  multi-worker conventions. New tests in `tests/bench/test_simulator.py`.
-
-- **B6 (#8):** `ablation_features.py` now emits `ablation_features.png` — a horizontal bar
-  chart of all 15 feature importances with the top 3 highlighted. `docs/v2/BENCHMARKS.md`
-  adds "Feature importance (ablation)" and "Drift recovery" sections with captions.
-  Root `README.md` gains an "Evidence" section linking both plots. PNGs committed to
-  `docs/assets/`.
-
-#### chronoq-celery
-
-- **A1 (#9):** `integrations/celery/examples/toggle_demo.py` — eager-mode Celery demo
-  using `task_always_eager=True`. Submits varied-duration tasks in both `CHRONOQ_MODE=fifo`
-  and `CHRONOQ_MODE=active`; prints wall-clock mean JCT for each mode; exits 0 in <30s.
-  `integrations/celery/examples/README.md` documents run instructions and caveats.
-  `tests/celery/test_examples.py` subprocess exit-0 check added.
-
-- **A2 (#10):** `examples/celery-docker/` — Docker Compose A/B stack: `redis:7` + Celery
-  worker (`concurrency=4`) + producer. `producer.py` enqueues 500 jobs through
-  `LearnedScheduler.submit`, records `(submit_ts, complete_ts)` per task to CSV via
-  `task_success` signal. `plot_jct.py` renders a histogram and mean/p99 bar chart.
-  `run_ab.sh` runs FIFO then active, then plots. `examples/celery-docker/README.md`
-  is a walkthrough with expected output.
-
-#### chronoq-ranker (hotfixes)
-
-- **fix (#11):** `toggle_demo.py` output converted to ASCII-only (`>=` instead of `>=`
-  Unicode, pipe characters swapped) to prevent `UnicodeEncodeError` on Windows cp1252
-  subprocesses.
-
-- **fix (#12):** `TaskRanker` auto-retrain trigger replaced `datetime`-based
-  `count_since()` comparison with a monotonic integer counter (`_records_since_retrain: int`).
-  The Windows system clock has a 15ms tick resolution, causing `count_since()` to
-  double-count records inserted within the same tick. The counter is now incremented
-  atomically inside `record()` and reset to 0 inside `retrain()`. New test file
-  `tests/ranker/test_retrain_trigger_precision.py` with 19 regression tests.
-
-- **fix (#13):** `LambdaRankEstimator.version()` now appends a per-instance monotonic
-  counter suffix (`-N`) so two estimators trained on identical data return distinct
-  version strings. Previously both returned the SHA-256 of the serialized booster,
-  causing the version-gate logic to treat a re-fitted estimator as unchanged.
-  `tests/ranker/test_retrain_trigger.py` updated to `time.sleep(0.02)` past the Windows
-  15ms tick boundary.
-
-- **fix (#15):** `TaskRanker.retrain()` wraps the post-fit state update (`_estimator`,
-  `_last_retrain_at`, `_records_since_retrain`) in a `try/finally` block so the
-  auto-retrain counter resets even when `LGBMRanker.fit()` raises. Without this, a
-  failed fit silently freezes auto-retrain until a manual restart.
-
-#### docs
-
-- **docs (#14):** `docs/v2/BENCHMARKS.md` "Cross-platform reproducibility" note upgraded
-  from a "±2%" tolerance claim to a byte-identical SHA-256 assertion
-  (`e101be378784e75b48b01e2818011f22c03828e2eb3c83cd0a48da80858119b6`), validated on
-  macOS Apple Silicon and Windows Ryzen 5 3600. The `±2%` framing was inaccurate because
-  the simulation is deterministic given the same seed.
-
-- **docs (#15):** Test count updated throughout (`225 → 244`): `tests/CLAUDE.md` header,
-  `docs/v2/BENCHMARKS.md` reference. `ranker/CLAUDE.md` clarified that `DriftReport` is
-  produced per-retrain (inter-retrain semantics), not intra-retrain.
+### Changed
+- Semver policy adopted (`docs/v2/internal/versioning.md`); "Wave" vocabulary dropped from external docs
 
 ---
 
