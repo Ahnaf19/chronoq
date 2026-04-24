@@ -114,16 +114,35 @@ def test_burstgpt_loader_offline_sample_loads(monkeypatch) -> None:
     list of TraceJob from the committed CI fixture at bench/fixtures/burstgpt_ci_sample.parquet.
 
     This is the canonical offline gate: every CI run must exercise this path.
-    Later commits in this branch update the assertions for the multi-type binning.
+    task_type is binned from output_length: llm_short (<100), llm_medium (100-400),
+    llm_long (>400). All three types must be present in the stratified 100-row fixture.
     """
     monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
     from chronoq_bench.traces.burstgpt import BurstGPTLoader
 
+    _VALID_TYPES = {"llm_short", "llm_medium", "llm_long"}
     jobs = BurstGPTLoader().load()
     assert len(jobs) > 0, "BurstGPTLoader offline should return at least 1 job"
     assert all(isinstance(j, TraceJob) for j in jobs)
+    assert all(j.task_type in _VALID_TYPES for j in jobs), (
+        f"Unexpected task types: {set(j.task_type for j in jobs) - _VALID_TYPES}"
+    )
     assert all(j.true_ms > 0.0 for j in jobs)
     assert all(j.payload_size > 0 for j in jobs)
+
+
+def test_burstgpt_task_type_binning_coverage(monkeypatch) -> None:
+    """CI fixture must contain at least one job of each task type (stratified sample)."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from collections import Counter
+
+    from chronoq_bench.traces.burstgpt import BurstGPTLoader
+
+    jobs = BurstGPTLoader().load()
+    counts = Counter(j.task_type for j in jobs)
+    assert counts["llm_short"] > 0, "No llm_short jobs in CI fixture"
+    assert counts["llm_medium"] > 0, "No llm_medium jobs in CI fixture"
+    assert counts["llm_long"] > 0, "No llm_long jobs in CI fixture"
 
 
 # ---------------------------------------------------------------------------
