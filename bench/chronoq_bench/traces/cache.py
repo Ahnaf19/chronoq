@@ -42,9 +42,7 @@ PHILLY_CSV_URL = "https://github.com/msr-fiddle/philly-traces/raw/master/cluster
 HELIOS_DATA_DIR = DATA_DIR / "helios"
 HELIOS_CACHE_PATH = HELIOS_DATA_DIR / "helios_jobs.parquet"
 HELIOS_CI_SAMPLE_PATH = FIXTURES_DIR / "helios_ci_sample.parquet"
-HELIOS_DOWNLOAD_URL = (
-    "https://github.com/S-Lab-System-Group/HeliosData/archive/refs/heads/main.zip"
-)
+HELIOS_DOWNLOAD_URL = "https://github.com/S-Lab-System-Group/HeliosData/archive/refs/heads/main.zip"
 
 
 def is_offline() -> bool:

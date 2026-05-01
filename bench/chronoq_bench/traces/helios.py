@@ -133,7 +133,7 @@ class HeliosLoader(TraceLoader):
             df = df.head(limit)
         return df
 
-    def _download_and_process(self) -> "pd.DataFrame":
+    def _download_and_process(self) -> pd.DataFrame:
         """Download HeliosData zip from GitHub, extract job CSVs, and cache result."""
         HELIOS_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -147,16 +147,14 @@ class HeliosLoader(TraceLoader):
             logger.info("Helios: downloaded {:,} bytes", len(raw))
             df = self._extract_and_parse(raw)
         except Exception as exc:
-            logger.warning(
-                "Helios: download/parse failed ({}) — using synthetic fallback", exc
-            )
+            logger.warning("Helios: download/parse failed ({}) — using synthetic fallback", exc)
             df = self._synthetic_fallback()
 
         df.to_parquet(HELIOS_CACHE_PATH, index=False)
         logger.info("Helios: cached {} rows to {}", len(df), HELIOS_CACHE_PATH)
         return df
 
-    def _extract_and_parse(self, raw: bytes) -> "pd.DataFrame":
+    def _extract_and_parse(self, raw: bytes) -> pd.DataFrame:
         """Extract job-level CSVs from the downloaded zip and concatenate them."""
         import pandas as pd
 
@@ -207,7 +205,7 @@ class HeliosLoader(TraceLoader):
         logger.info("Helios: concatenated {} total rows", len(df))
         return self._normalise(df)
 
-    def _normalise(self, df: "pd.DataFrame") -> "pd.DataFrame":
+    def _normalise(self, df: pd.DataFrame) -> pd.DataFrame:
         """Rename Helios columns to the expected schema.
 
         Handles column naming variations across Helios CSV versions.
@@ -238,9 +236,7 @@ class HeliosLoader(TraceLoader):
             mask = df[status_col].astype(str).str.lower().str.strip().isin(_COMPLETED_STATUSES)
             before = len(df)
             df = df[mask].copy()
-            logger.info(
-                "Helios: filtered {} → {} rows (completed status only)", before, len(df)
-            )
+            logger.info("Helios: filtered {} → {} rows (completed status only)", before, len(df))
 
         # --- duration (seconds) ---
         dur_col = _find(["duration", "run_time", "runtime", "elapsed"])
@@ -297,7 +293,7 @@ class HeliosLoader(TraceLoader):
         return df[["job_id", "submit_time", "duration", "queue_time", "gpu_num", "task_type"]]
 
     @staticmethod
-    def _synthetic_fallback() -> "pd.DataFrame":
+    def _synthetic_fallback() -> pd.DataFrame:
         """Generate 100 synthetic Helios-like rows when download fails.
 
         Statistics are calibrated to match the Helios workload:
@@ -336,7 +332,7 @@ class HeliosLoader(TraceLoader):
         logger.info("Helios: synthetic fallback generated {} rows", len(df))
         return df
 
-    def _validate_schema(self, df: "pd.DataFrame") -> None:
+    def _validate_schema(self, df: pd.DataFrame) -> None:
         """Fail loudly if required columns are missing."""
         missing = _REQUIRED_COLS - set(df.columns)
         if missing:
@@ -346,7 +342,7 @@ class HeliosLoader(TraceLoader):
                 f"{HELIOS_CACHE_PATH} and re-run to regenerate."
             )
 
-    def _to_trace_jobs(self, df: "pd.DataFrame") -> list[TraceJob]:
+    def _to_trace_jobs(self, df: pd.DataFrame) -> list[TraceJob]:
         """Convert a normalised Helios DataFrame to TraceJob instances."""
         jobs = []
         for row in df.itertuples(index=False):

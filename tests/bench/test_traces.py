@@ -431,7 +431,6 @@ def test_helios_loader_schema_validation(monkeypatch) -> None:
     monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
     import pandas as pd
     import pytest
-
     from chronoq_bench.traces.helios import HeliosLoader
 
     loader = HeliosLoader()
