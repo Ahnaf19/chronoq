@@ -598,7 +598,8 @@ def _build_loader(trace_name: str) -> TraceLoader | None:
 
         return MooncakeLoader()
     raise ValueError(
-        f"Unknown trace '{trace_name}'. Choices: synthetic, burstgpt, borg, azure, philly, helios, mooncake"
+        f"Unknown trace '{trace_name}'. "
+        "Choices: synthetic, burstgpt, borg, azure, philly, helios, mooncake"
     )
 
 
