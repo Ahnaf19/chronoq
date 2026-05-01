@@ -30,6 +30,13 @@ AZURE_DATA_DIR = DATA_DIR / "azure"
 AZURE_CACHE_PATH = DATA_DIR / "azure_sampled.parquet"
 AZURE_CI_SAMPLE_PATH = FIXTURES_DIR / "azure_ci_sample.parquet"
 
+# Microsoft Philly DNN-training cluster trace (MSR, CC-BY 4.0)
+# Source: https://github.com/msr-fiddle/philly-traces
+PHILLY_DATA_DIR = DATA_DIR / "philly"
+PHILLY_CACHE_PATH = PHILLY_DATA_DIR / "philly_jobs.parquet"
+PHILLY_CI_SAMPLE_PATH = FIXTURES_DIR / "philly_ci_sample.parquet"
+PHILLY_CSV_URL = "https://github.com/msr-fiddle/philly-traces/raw/master/cluster-job-log.csv.tar.gz"
+
 
 def is_offline() -> bool:
     """True when CHRONOQ_BENCH_OFFLINE=1 — use CI sample, skip HF download."""

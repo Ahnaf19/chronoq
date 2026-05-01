@@ -286,3 +286,105 @@ def test_azure_loader_multi_type_diversity(monkeypatch) -> None:
     assert len(unique_types) >= 10, (
         f"Expected >=10 unique task_types in Azure CI fixture, got {len(unique_types)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# PhillyLoader (offline mode only in CI)
+# ---------------------------------------------------------------------------
+
+
+def test_philly_loader_offline_sample_loads(monkeypatch) -> None:
+    """CI fixture loads cleanly in offline mode and returns 100 TraceJobs."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.philly import PhillyLoader
+
+    loader = PhillyLoader()
+    jobs = loader.load()
+    assert len(jobs) == 100
+    assert all(isinstance(j, TraceJob) for j in jobs)
+
+
+def test_philly_jobs_have_positive_durations(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.philly import PhillyLoader
+
+    jobs = PhillyLoader().load()
+    assert all(j.true_ms > 0 for j in jobs)
+
+
+def test_philly_task_types_are_nonempty_strings(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.philly import PhillyLoader
+
+    jobs = PhillyLoader().load()
+    assert all(isinstance(j.task_type, str) and j.task_type for j in jobs)
+
+
+def test_philly_loader_name() -> None:
+    from chronoq_bench.traces.philly import PhillyLoader
+
+    assert PhillyLoader().name == "philly"
+
+
+def test_philly_loader_schema_validation(monkeypatch) -> None:
+    """Loader raises ValueError when required columns are missing from cache."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    import pandas as pd
+    import pytest
+    from chronoq_bench.traces.philly import PhillyLoader
+
+    loader = PhillyLoader()
+    bad_df = pd.DataFrame({"foo": [1, 2, 3]})
+    with pytest.raises(ValueError, match="missing required columns"):
+        loader._validate_schema(bad_df)
+
+
+def test_philly_loader_payload_sizes_positive(monkeypatch) -> None:
+    """payload_size must be >= 1 (num_gpu * 1000, clamped to min 1)."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.philly import PhillyLoader
+
+    jobs = PhillyLoader().load()
+    assert all(j.payload_size >= 1 for j in jobs)
+
+
+def test_philly_multi_type_diversity(monkeypatch) -> None:
+    """CI fixture must contain multiple unique VCs (task types)."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.philly import PhillyLoader
+
+    jobs = PhillyLoader().load()
+    unique_types = {j.task_type for j in jobs}
+    assert len(unique_types) >= 3, (
+        f"Expected >= 3 unique VCs in Philly CI fixture, got {len(unique_types)}"
+    )
+
+
+def test_philly_task_types_are_known_vcs(monkeypatch) -> None:
+    """All task_types in the CI fixture should be known Philly VC names."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.philly import _KNOWN_VCS, PhillyLoader
+
+    jobs = PhillyLoader().load()
+    # CI fixture is synthetic with a fixed VC list — all should be known
+    unknown = {j.task_type for j in jobs} - _KNOWN_VCS
+    assert not unknown, f"Unexpected VC names in CI fixture: {unknown}"
+
+
+def test_philly_loader_load_n(monkeypatch) -> None:
+    """load(n=k) returns exactly k jobs when fixture has >= k rows."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.philly import PhillyLoader
+
+    jobs = PhillyLoader().load(n=20)
+    assert len(jobs) == 20
+
+
+def test_philly_num_gpu_in_metadata(monkeypatch) -> None:
+    """Each TraceJob must carry num_gpu in its metadata dict."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.philly import PhillyLoader
+
+    jobs = PhillyLoader().load()
+    assert all("num_gpu" in j.metadata for j in jobs)
+    assert all(j.metadata["num_gpu"] >= 1 for j in jobs)
