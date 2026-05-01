@@ -119,6 +119,41 @@ CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row sample committed at `bench/fix
 | Unique task types | 7,917 |
 | Trigger types | http, timer, queue, event, storage, orchestration, others |
 
+
+### Helios multi-tenant GPU cluster
+
+SenseTime Helios multi-tenant GPU cluster trace. Source: [S-Lab-System-Group/HeliosData](https://github.com/S-Lab-System-Group/HeliosData), GitHub repository. Licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+```bash
+# Downloads ~36 MB zip from GitHub on first run, cached to bench/data/helios/
+CHRONOQ_BENCH_OFFLINE=0 uv run python -m chronoq_bench.experiments.jct_vs_load --trace helios
+```
+
+CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row sample committed at `bench/fixtures/helios_ci_sample.parquet`).
+
+**Dataset**: ~3.36M GPU cluster jobs from a large-scale, multi-tenant deep-learning training cluster operated by SenseTime. The trace covers full job lifecycles with explicit `duration` (execution time) and `queue_time` (time spent waiting). Jobs span 4+ internal tenants with characteristically different workload profiles and GPU allocation patterns.
+
+**Task-type derivation**: Helios does not publish a semantic job-type field. The loader derives `task_type` from `tenant_id` (preferred — 4 tenant tiers with distinct duration distributions) or from GPU tier (`gpu_num` binned to `gpu_1`, `gpu_2`, `gpu_4`, `gpu_8`, `gpu_16`) when tenant identity is unavailable. `payload_size` = `gpu_num * 1000`.
+
+**Workload characteristics**:
+
+- **High duration variance**: LogNormal-distributed durations with σ ≈ 2.0 — a 1000:1 ratio between the shortest single-GPU jobs and large distributed training runs. This is strong signal for LambdaRank.
+- **Explicit queue_time**: Helios includes per-job queue wait time in the raw data, accessible via `TraceJob.metadata["queue_time_ms"]`. This is unique among the four loaders and can be used to validate simulation assumptions.
+- **4 tenant tiers**: Tenant-level `task_type` labels (4 groups) give `recent_mean_ms_this_type` good discrimination between interactive single-GPU jobs and multi-GPU training runs.
+
+**Expected improvement signal**: Helios's wide duration variance (heavy tail from large distributed training jobs) is similar to the synthetic Pareto trace's structure. LambdaRank's primary feature (`recent_mean_ms_this_type`) should carry high importance when tenant_id is available, since tenants have characteristically different duration distributions. Full experiment results require the ~36 MB download; the CI fixture is a 100-row synthetic sample matching Helios statistics.
+
+**Download strategy**: On first run the loader downloads the HeliosData GitHub repository as a zip, scans for job-level CSV files, concatenates them, and caches the normalised result to `bench/data/helios/helios_jobs.parquet`. A synthetic fallback (100 rows, seed=42, matching the CI fixture) is used if the download fails or times out.
+
+```bash
+# Full run (requires download)
+CHRONOQ_BENCH_OFFLINE=0 uv run python -m chronoq_bench.experiments.jct_vs_load --trace helios
+# produces bench/artifacts/results_helios.json + jct_vs_load_helios.png
+
+# CI smoke (offline, synthetic fixture)
+CHRONOQ_BENCH_OFFLINE=1 CHRONOQ_BENCH_SMOKE=1 uv run python -m chronoq_bench.experiments.jct_vs_load --trace helios
+```
+
 ## Schedulers
 
 | Name | Key | Algorithm |

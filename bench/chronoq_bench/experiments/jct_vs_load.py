@@ -589,8 +589,12 @@ def _build_loader(trace_name: str) -> TraceLoader | None:
         from chronoq_bench.traces.philly import PhillyLoader
 
         return PhillyLoader()
+    if trace_name == "helios":
+        from chronoq_bench.traces.helios import HeliosLoader
+
+        return HeliosLoader()
     raise ValueError(
-        f"Unknown trace '{trace_name}'. Choices: synthetic, burstgpt, borg, azure, philly"
+        f"Unknown trace '{trace_name}'. Choices: synthetic, burstgpt, borg, azure, philly, helios"
     )
 
 
@@ -600,7 +604,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="JCT vs load benchmark sweep.")
     parser.add_argument(
         "--trace",
-        choices=["synthetic", "burstgpt", "borg", "azure", "philly"],
+        choices=["synthetic", "burstgpt", "borg", "azure", "philly", "helios"],
         default="synthetic",
         help="Trace loader to use (default: synthetic Pareto).",
     )
@@ -612,8 +616,8 @@ def main() -> None:
     load_pts = [0.5, 0.7] if smoke else _LOAD_POINTS
     seeds = [_SEED] if smoke else _DEFAULT_SEEDS
 
-    # Philly smoke mode: CI fixture is 100 rows; use smaller train/eval split
-    if smoke and args.trace == "philly":
+    # Philly and Helios CI fixtures are 100 rows; tighten train/eval in smoke mode.
+    if smoke and args.trace in ("philly", "helios"):
         n_train, n_eval = 60, 30
 
     loader = _build_loader(args.trace)

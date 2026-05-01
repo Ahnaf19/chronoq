@@ -37,6 +37,13 @@ PHILLY_CACHE_PATH = PHILLY_DATA_DIR / "philly_jobs.parquet"
 PHILLY_CI_SAMPLE_PATH = FIXTURES_DIR / "philly_ci_sample.parquet"
 PHILLY_CSV_URL = "https://github.com/msr-fiddle/philly-traces/raw/master/cluster-job-log.csv.tar.gz"
 
+# Helios SenseTime multi-tenant GPU cluster trace (CC-BY 4.0)
+# GitHub: S-Lab-System-Group/HeliosData
+HELIOS_DATA_DIR = DATA_DIR / "helios"
+HELIOS_CACHE_PATH = HELIOS_DATA_DIR / "helios_jobs.parquet"
+HELIOS_CI_SAMPLE_PATH = FIXTURES_DIR / "helios_ci_sample.parquet"
+HELIOS_DOWNLOAD_URL = "https://github.com/S-Lab-System-Group/HeliosData/archive/refs/heads/main.zip"
+
 
 def is_offline() -> bool:
     """True when CHRONOQ_BENCH_OFFLINE=1 — use CI sample, skip HF download."""
