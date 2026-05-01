@@ -366,7 +366,6 @@ def test_philly_task_types_are_known_vcs(monkeypatch) -> None:
     from chronoq_bench.traces.philly import _KNOWN_VCS, PhillyLoader
 
     jobs = PhillyLoader().load()
-    # CI fixture is synthetic with a fixed VC list — all should be known
     unknown = {j.task_type for j in jobs} - _KNOWN_VCS
     assert not unknown, f"Unexpected VC names in CI fixture: {unknown}"
 
@@ -388,3 +387,105 @@ def test_philly_num_gpu_in_metadata(monkeypatch) -> None:
     jobs = PhillyLoader().load()
     assert all("num_gpu" in j.metadata for j in jobs)
     assert all(j.metadata["num_gpu"] >= 1 for j in jobs)
+
+
+# ---------------------------------------------------------------------------
+# HeliosLoader (offline mode only in CI)
+# ---------------------------------------------------------------------------
+
+
+def test_helios_loader_offline_sample_loads(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.helios import HeliosLoader
+
+    loader = HeliosLoader()
+    jobs = loader.load()
+    assert len(jobs) == 100
+    assert all(isinstance(j, TraceJob) for j in jobs)
+
+
+def test_helios_jobs_have_positive_durations(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.helios import HeliosLoader
+
+    jobs = HeliosLoader().load()
+    assert all(j.true_ms > 0 for j in jobs)
+
+
+def test_helios_task_types_are_nonempty_strings(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.helios import HeliosLoader
+
+    jobs = HeliosLoader().load()
+    assert all(isinstance(j.task_type, str) and j.task_type for j in jobs)
+
+
+def test_helios_loader_name() -> None:
+    from chronoq_bench.traces.helios import HeliosLoader
+
+    assert HeliosLoader().name == "helios"
+
+
+def test_helios_loader_schema_validation(monkeypatch) -> None:
+    """Loader raises ValueError when required columns are missing from cache."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    import pandas as pd
+    import pytest
+
+    from chronoq_bench.traces.helios import HeliosLoader
+
+    loader = HeliosLoader()
+    bad_df = pd.DataFrame({"foo": [1, 2, 3]})
+    with pytest.raises(ValueError, match="missing required columns"):
+        loader._validate_schema(bad_df)
+
+
+def test_helios_payload_sizes_positive(monkeypatch) -> None:
+    """payload_size = gpu_num * 1000 must be at least 1000."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.helios import HeliosLoader
+
+    jobs = HeliosLoader().load()
+    assert all(j.payload_size >= 1000 for j in jobs)
+
+
+def test_helios_multi_type_diversity(monkeypatch) -> None:
+    """CI fixture must contain multiple unique task_types (tenants or gpu tiers)."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.helios import HeliosLoader
+
+    jobs = HeliosLoader().load()
+    unique_types = {j.task_type for j in jobs}
+    assert len(unique_types) >= 2, (
+        f"Expected >=2 unique task_types in Helios CI fixture, got {len(unique_types)}"
+    )
+
+
+def test_helios_queue_time_in_metadata(monkeypatch) -> None:
+    """Each TraceJob must carry queue_time_ms in its metadata dict."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.helios import HeliosLoader
+
+    jobs = HeliosLoader().load()
+    assert all("queue_time_ms" in j.metadata for j in jobs)
+    assert all(j.metadata["queue_time_ms"] >= 0.0 for j in jobs)
+
+
+def test_helios_load_n_override(monkeypatch) -> None:
+    """load(n=20) must return exactly 20 jobs from the 100-row CI fixture."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.helios import HeliosLoader
+
+    jobs = HeliosLoader().load(n=20)
+    assert len(jobs) == 20
+
+
+def test_helios_gpu_num_in_metadata(monkeypatch) -> None:
+    """Each TraceJob must carry gpu_num in its metadata dict."""
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.helios import HeliosLoader
+
+    jobs = HeliosLoader().load()
+    valid_gpu_counts = {1, 2, 4, 8, 16}
+    assert all("gpu_num" in j.metadata for j in jobs)
+    assert all(j.metadata["gpu_num"] in valid_gpu_counts for j in jobs)
