@@ -4,7 +4,12 @@ All notable changes to Chronoq. Format based on [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
-_Nothing yet. Wave 2.5 (→ v0.2.1): three more real traces — Philly DL-training, Helios multi-tenant GPU, Mooncake cross-provider LLM._
+_PRs open, pending merge and version bump for v0.2.1._
+
+### Added (→ v0.2.1)
+- **`chronoq-bench`**: `PhillyLoader` — Microsoft Philly DNN-training cluster trace (MSR, CC-BY 4.0, USENIX ATC 2019). Duration from `submitted_time`→`end_time`, task type from virtual cluster name, `num_gpu` in metadata. CI fixture: synthetic, seeded, 100 rows. (PR #23)
+- **`chronoq-bench`**: `HeliosLoader` — SenseTime Helios multi-tenant GPU cluster trace (CC-BY 4.0, 3.36M jobs). Explicit `duration` column; exposes `queue_time_ms` in `TraceJob.metadata` — unique among all loaders. CI fixture: synthetic, 4 tenants, 100 rows. (PR #24)
+- **`chronoq-bench`**: `MooncakeLoader` — Kimi LLM inference trace (kvcache-ai/Mooncake FAST'25, Apache 2.0). Duration synthesized from token counts (`20.0 + 8.0 × output_tokens`); task type binned from `output_tokens` into `kv_short`/`kv_medium`/`kv_long`. CI fixture: synthetic, stratified, 100 rows. (PR #25)
 
 ## [0.2.0.post1] — 2026-04-24
 
