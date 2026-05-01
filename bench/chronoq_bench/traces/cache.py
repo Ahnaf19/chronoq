@@ -44,6 +44,13 @@ HELIOS_CACHE_PATH = HELIOS_DATA_DIR / "helios_jobs.parquet"
 HELIOS_CI_SAMPLE_PATH = FIXTURES_DIR / "helios_ci_sample.parquet"
 HELIOS_DOWNLOAD_URL = "https://github.com/S-Lab-System-Group/HeliosData/archive/refs/heads/main.zip"
 
+# Mooncake cross-provider LLM trace (Kimi FAST'25, synthetic CI fixture only).
+# The public dataset is not freely redistributable; the CI fixture is a 100-row
+# synthetic stub generated deterministically from rng=np.random.default_rng(42).
+# duration_ms = 20.0 + 8.0 * output_tokens  (no noise, deterministic).
+MOONCAKE_CI_SAMPLE_PATH = FIXTURES_DIR / "mooncake_ci_sample.parquet"
+# No live download path — this trace is CI-fixture-only in this release.
+
 
 def is_offline() -> bool:
     """True when CHRONOQ_BENCH_OFFLINE=1 — use CI sample, skip HF download."""

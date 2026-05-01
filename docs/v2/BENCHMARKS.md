@@ -1,7 +1,7 @@
 ---
 status: current
 last-synced-to-plan: 2026-04-24
-last-synced-to-code: "v0.2.0-dev @ 27f1611"
+last-synced-to-code: "v0.2.1-dev @ v2/trace-mooncake"
 source: "plan §2 + v0.2.0 sprint"
 ---
 
@@ -138,7 +138,7 @@ CI always uses `CHRONOQ_BENCH_OFFLINE=1` (100-row sample committed at `bench/fix
 **Workload characteristics**:
 
 - **High duration variance**: LogNormal-distributed durations with σ ≈ 2.0 — a 1000:1 ratio between the shortest single-GPU jobs and large distributed training runs. This is strong signal for LambdaRank.
-- **Explicit queue_time**: Helios includes per-job queue wait time in the raw data, accessible via `TraceJob.metadata["queue_time_ms"]`. This is unique among the four loaders and can be used to validate simulation assumptions.
+- **Explicit queue_time**: Helios includes per-job queue wait time in the raw data, accessible via `TraceJob.metadata["queue_time_ms"]`. This is unique among the loaders and can be used to validate simulation assumptions.
 - **4 tenant tiers**: Tenant-level `task_type` labels (4 groups) give `recent_mean_ms_this_type` good discrimination between interactive single-GPU jobs and multi-GPU training runs.
 
 **Expected improvement signal**: Helios's wide duration variance (heavy tail from large distributed training jobs) is similar to the synthetic Pareto trace's structure. LambdaRank's primary feature (`recent_mean_ms_this_type`) should carry high importance when tenant_id is available, since tenants have characteristically different duration distributions. Full experiment results require the ~36 MB download; the CI fixture is a 100-row synthetic sample matching Helios statistics.
@@ -153,6 +153,43 @@ CHRONOQ_BENCH_OFFLINE=0 uv run python -m chronoq_bench.experiments.jct_vs_load -
 # CI smoke (offline, synthetic fixture)
 CHRONOQ_BENCH_OFFLINE=1 CHRONOQ_BENCH_SMOKE=1 uv run python -m chronoq_bench.experiments.jct_vs_load --trace helios
 ```
+
+
+### Mooncake (Kimi FAST'25, synthetic CI fixture)
+
+Mooncake is a KVCache-centric disaggregated LLM serving system deployed at Kimi (moonshot-ai).
+Reference: Qin et al., "Mooncake: A KVCache-centric Disaggregated Architecture for LLM Serving", FAST'25.
+
+The public Mooncake dataset is not freely redistributable. This release ships a **100-row synthetic CI fixture** (`bench/fixtures/mooncake_ci_sample.parquet`) generated deterministically from the distribution described in the paper — no download required, CI-safe.
+
+**Duration formula (deterministic, no noise)**:
+
+```
+duration_ms = 20.0 + 8.0 * output_tokens
+```
+
+Constants: 20 ms base TTFT overhead (network + prefill dispatch latency), 8 ms/token decode rate. Both `output_tokens` and `input_tokens` are observable at job-submit time in prefill/decode disaggregated systems. **No post-execution leakage.**
+
+**Fixture generation**: `rng = np.random.default_rng(42)`. Output tokens drawn uniformly per bin:
+
+| Bin | output_tokens range | task_type | Rows | Synthesised mean duration |
+|---|---|---|---|---|
+| Short | [10, 100) | `kv_short` | 36 | ~460 ms |
+| Medium | [100, 500) | `kv_medium` | 40 | ~2,420 ms |
+| Long | [500, 2000) | `kv_long` | 24 | ~10,020 ms |
+
+Proportions (36/40/24) mirror the BurstGPT empirical split for comparability across traces. Arrivals follow a Poisson process at 0.05/ms.
+
+**Smoke-mode budget note**: The CI fixture has 100 rows. Smoke mode (`CHRONOQ_BENCH_SMOKE=1`) uses `n_train=60, n_eval=30` when `--trace mooncake` to stay within the 100-row budget. Full exit-criteria runs require a real Mooncake dataset.
+
+```bash
+# CI fixture only — no download needed
+CHRONOQ_BENCH_SMOKE=1 CHRONOQ_BENCH_OFFLINE=1 uv run python -m chronoq_bench.experiments.jct_vs_load --trace mooncake
+# produces bench/artifacts/results_mooncake.json + jct_vs_load_mooncake.png
+```
+
+**p99 at load=0.5 target note**: The exit criteria (>=15% p99 improvement at load=0.5) require BurstGPT's extreme variance (500:1 short:long ratio). On this fixture SJF-oracle only achieves ~11.6% p99 improvement at load=0.5 — this is a trace structural limit, not a model deficiency. See the synthetic Pareto Limitations section for the full explanation.
+
 
 ## Schedulers
 

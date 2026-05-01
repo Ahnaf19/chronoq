@@ -488,3 +488,75 @@ def test_helios_gpu_num_in_metadata(monkeypatch) -> None:
     valid_gpu_counts = {1, 2, 4, 8, 16}
     assert all("gpu_num" in j.metadata for j in jobs)
     assert all(j.metadata["gpu_num"] in valid_gpu_counts for j in jobs)
+
+
+# ---------------------------------------------------------------------------
+# Mooncake (Kimi LLM) trace
+# ---------------------------------------------------------------------------
+
+
+def test_mooncake_loader_offline_sample_loads(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.mooncake import MooncakeLoader
+
+    jobs = MooncakeLoader().load()
+    assert len(jobs) == 100
+    assert all(isinstance(j, TraceJob) for j in jobs)
+
+
+def test_mooncake_jobs_have_positive_durations(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.mooncake import MooncakeLoader
+
+    jobs = MooncakeLoader().load()
+    assert all(j.true_ms > 0.0 for j in jobs)
+
+
+def test_mooncake_task_types_span_multiple_bins(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.mooncake import MooncakeLoader
+
+    jobs = MooncakeLoader().load()
+    types = {j.task_type for j in jobs}
+    assert len(types) >= 2, f"expected multiple task type bins, got {types}"
+
+
+def test_mooncake_loader_name() -> None:
+    from chronoq_bench.traces.mooncake import MooncakeLoader
+
+    assert MooncakeLoader().name == "mooncake"
+
+
+def test_mooncake_payload_size_positive(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.mooncake import MooncakeLoader
+
+    jobs = MooncakeLoader().load()
+    assert all(j.payload_size >= 1 for j in jobs)
+
+
+def test_mooncake_loader_load_n(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.mooncake import MooncakeLoader
+
+    jobs = MooncakeLoader().load(n=50)
+    assert len(jobs) == 50
+
+
+def test_mooncake_metadata_has_output_tokens(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.mooncake import MooncakeLoader
+
+    jobs = MooncakeLoader().load()
+    assert all("output_tokens" in j.metadata for j in jobs)
+    assert all(j.metadata["output_tokens"] > 0 for j in jobs)
+
+
+def test_mooncake_task_types_are_kv_bins(monkeypatch) -> None:
+    monkeypatch.setenv("CHRONOQ_BENCH_OFFLINE", "1")
+    from chronoq_bench.traces.mooncake import MooncakeLoader
+
+    jobs = MooncakeLoader().load()
+    valid_types = {"kv_short", "kv_medium", "kv_long"}
+    invalid = {j.task_type for j in jobs} - valid_types
+    assert not invalid, f"unexpected task_type values: {invalid}"
