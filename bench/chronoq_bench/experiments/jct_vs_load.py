@@ -585,7 +585,13 @@ def _build_loader(trace_name: str) -> TraceLoader | None:
         from chronoq_bench.traces.azure import AzureLoader
 
         return AzureLoader()
-    raise ValueError(f"Unknown trace '{trace_name}'. Choices: synthetic, burstgpt, borg, azure")
+    if trace_name == "philly":
+        from chronoq_bench.traces.philly import PhillyLoader
+
+        return PhillyLoader()
+    raise ValueError(
+        f"Unknown trace '{trace_name}'. Choices: synthetic, burstgpt, borg, azure, philly"
+    )
 
 
 def main() -> None:
@@ -594,7 +600,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="JCT vs load benchmark sweep.")
     parser.add_argument(
         "--trace",
-        choices=["synthetic", "burstgpt", "borg", "azure"],
+        choices=["synthetic", "burstgpt", "borg", "azure", "philly"],
         default="synthetic",
         help="Trace loader to use (default: synthetic Pareto).",
     )
@@ -605,6 +611,10 @@ def main() -> None:
     n_eval = 100 if smoke else _N_EVAL
     load_pts = [0.5, 0.7] if smoke else _LOAD_POINTS
     seeds = [_SEED] if smoke else _DEFAULT_SEEDS
+
+    # Philly smoke mode: CI fixture is 100 rows; use smaller train/eval split
+    if smoke and args.trace == "philly":
+        n_train, n_eval = 60, 30
 
     loader = _build_loader(args.trace)
 
