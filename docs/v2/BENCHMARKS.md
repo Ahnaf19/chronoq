@@ -410,3 +410,83 @@ The three-bin schema (`<100`, `100–400`, `>400` tokens) matches natural percen
 ### Per-seed variance
 
 A proper variance study would draw different random subsamples of the 1.4M-row dataset per seed. This sweep used a single fixed subsample across all 10 seeds — identical results across seeds confirm determinism but do not bound sampling variance. Planned for a future run.
+
+### Philly DNN-training results
+
+**CI fixture is synthetic; full results require downloading the ~1 GB Philly tarball.**
+
+To run the full Philly experiment:
+
+```bash
+CHRONOQ_BENCH_OFFLINE=0 uv run python -m chronoq_bench.experiments.jct_vs_load --trace philly
+# produces bench/artifacts/results_philly.json + jct_vs_load_philly.png
+```
+
+## Traces — Microsoft Philly DNN Training Cluster
+
+**Dataset**: Microsoft Philly cluster trace — DNN training jobs on a GPU cluster
+(October 2017 – August 2018, ~180 days).
+
+**Source**: Published at [msr-fiddle/philly-traces](https://github.com/msr-fiddle/philly-traces).
+Licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+**Paper**: Jeon et al., "Analysis of Large-Scale Multi-Tenant GPU Clusters for DNN Training
+Workloads", USENIX ATC 2019.
+
+### Workload type
+
+GPU-cluster batch workload: DNN training jobs with durations spanning minutes to hours.
+Each job targets a named virtual cluster (VC) — analogous to Borg's `scheduling_class` or
+Azure's `HashFunction`. VCs include `default`, `elvis`, `rr1`, `rr2`, `rr3`, and `mlperf`.
+Only `status == "Pass"` (completed) jobs are loaded.
+
+### Schema and duration derivation
+
+Raw CSV columns used:
+- `submitted_time` — job submission timestamp
+- `end_time` — job completion timestamp
+- `status` — "Pass" (kept), "Failed" / "Killed" (dropped)
+- `vc` — virtual cluster name → `task_type`
+- `num_gpu` — GPUs requested → `payload_size = num_gpu * 1000`
+
+Duration: `(end_time - submitted_time).total_seconds() * 1000` ms.
+Non-positive durations are dropped.
+
+### CI fixture note
+
+The CI fixture at `bench/fixtures/philly_ci_sample.parquet` is a **synthetic 100-row
+sample** generated from Philly-like distributions (LogNormal with published statistics),
+because the full dataset is a ~1 GB tarball. The fixture is seeded (seed=42) and
+reproducible. Results computed against this fixture are clearly labeled "synthetic" in
+log output.
+
+Synthetic parameters:
+- `duration_ms` ~ LogNormal(μ=ln(30 min), σ=1.5) — matching published Philly job duration statistics
+- `vc` ∈ {default, elvis, rr1, rr2, rr3} with empirical proportions (45/20/15/12/8 %)
+- `num_gpu` ∈ {1, 2, 4, 8, 16, 32} with empirical proportions
+
+### Expected workload characteristics (from published paper)
+
+| Metric | Value |
+|---|---|
+| Duration range | minutes to days |
+| Median duration | ~30 minutes |
+| Dominant VC | default (~45%) |
+| GPU footprint | 1–32 GPUs per job |
+| Status distribution | ~60% Pass, ~25% Failed, ~15% Killed |
+
+### ML signal expectation
+
+Philly has a small, stable set of VC names (5–6 values), which means
+`recent_mean_ms_this_type` will carry strong discriminative signal between VCs with
+systematically different job durations (e.g. `elvis` long-running research jobs vs
+`rr1`/`rr2` shorter production jobs). The feature importance profile should resemble the
+synthetic Pareto trace more closely than Azure (which has 7,917 unique types).
+
+### Exit criteria vs Philly trace
+
+The exit criteria (≥10% mean JCT, ≥15% p99 JCT vs FCFS at load=0.7) are defined for the
+synthetic Pareto trace. Results on the real Philly trace require a full benchmark run and
+will be reported here after the ~1 GB download is feasible in a developer environment.
+
+Placeholder — pending full run on real Philly data.
