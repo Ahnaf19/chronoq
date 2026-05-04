@@ -155,40 +155,80 @@ class HeliosLoader(TraceLoader):
         return df
 
     def _extract_and_parse(self, raw: bytes) -> pd.DataFrame:
-        """Extract job-level CSVs from the downloaded zip and concatenate them."""
+        """Extract job-level CSVs from the downloaded zip and concatenate them.
+
+        The HeliosData repo packages data in a nested structure:
+        - outer zip: HeliosData-master.zip
+          - HeliosData-master/data.zip  ← nested zip
+            - data/{Saturn,Uranus,Venus,Earth}/cluster_log.csv  ← job records
+            - data/{cluster}/cluster_gpu_number.csv  ← GPU allocation (skip)
+        """
         import pandas as pd
 
-        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+        frames = self._read_cluster_logs(io.BytesIO(raw))
+        if not frames:
+            return self._synthetic_fallback()
+
+        df = pd.concat(frames, ignore_index=True)
+        logger.info("Helios: concatenated {} total rows", len(df))
+        return self._normalise(df)
+
+    def _read_cluster_logs(self, raw_io: io.BytesIO) -> list:
+        """Open a zip (potentially nested) and return parsed DataFrames for each cluster_log."""
+        import pandas as pd
+
+        frames: list = []
+        with zipfile.ZipFile(raw_io) as zf:
             names = zf.namelist()
             logger.info("Helios: zip contains {} files", len(names))
 
-            # Find job-level CSV files — prefer files with "job" in the name,
-            # exclude resource-level files (gpu/cpu/memory monitoring).
+            # Handle nested data.zip (HeliosData repo structure).
+            nested_zips = [n for n in names if n.lower().endswith(".zip")]
+            if nested_zips:
+                for nested in nested_zips:
+                    logger.info("Helios: opening nested zip {}", nested)
+                    try:
+                        inner_bytes = zf.read(nested)
+                        frames.extend(self._read_cluster_logs(io.BytesIO(inner_bytes)))
+                    except Exception as exc:
+                        logger.warning("Helios: skipping nested zip {} — {}", nested, exc)
+                return frames
+
+            # cluster_log.csv — the canonical job-level file in HeliosData.
             job_files = [
                 n
                 for n in names
-                if n.lower().endswith(".csv")
-                and "job" in n.lower()
-                and not any(skip in n.lower() for skip in ("gpu_spec", "machine", "worker"))
+                if n.lower().endswith("cluster_log.csv")
             ]
             if not job_files:
-                # Fallback: take all CSVs that are not clearly resource-level
+                # Broader fallback: any CSV with "log" in the name, excluding GPU/node stats.
+                job_files = [
+                    n
+                    for n in names
+                    if n.lower().endswith(".csv")
+                    and "log" in n.lower()
+                    and not any(
+                        skip in n.lower()
+                        for skip in ("gpu_number", "gpu_spec", "machine", "worker", "node")
+                    )
+                ]
+            if not job_files:
+                # Last resort: any CSV not clearly resource-level.
                 job_files = [
                     n
                     for n in names
                     if n.lower().endswith(".csv")
                     and not any(
-                        skip in n.lower() for skip in ("machine", "gpu_spec", "worker", "node")
+                        skip in n.lower()
+                        for skip in ("gpu_number", "gpu_spec", "machine", "worker", "node")
                     )
                 ]
 
             logger.info("Helios: found {} candidate job CSV(s): {}", len(job_files), job_files)
-
             if not job_files:
-                logger.warning("Helios: no job CSV found in zip — using synthetic fallback")
-                return self._synthetic_fallback()
+                logger.warning("Helios: no job CSV found in zip")
+                return frames
 
-            frames = []
             for fname in job_files:
                 try:
                     with zf.open(fname) as fh:
@@ -198,12 +238,7 @@ class HeliosLoader(TraceLoader):
                 except Exception as exc:
                     logger.warning("Helios: skipping {} — {}", fname, exc)
 
-        if not frames:
-            return self._synthetic_fallback()
-
-        df = pd.concat(frames, ignore_index=True)
-        logger.info("Helios: concatenated {} total rows", len(df))
-        return self._normalise(df)
+        return frames
 
     def _normalise(self, df: pd.DataFrame) -> pd.DataFrame:
         """Rename Helios columns to the expected schema.
