@@ -8,7 +8,7 @@
 
 ![hero](docs/assets/jct_vs_load.png)
 
-**+32% mean JCT · +17.5% p99** vs FCFS on synthetic Pareto · **within 5.1%** of SJF-oracle on real BurstGPT traces · byte-identical reproducibility across macOS + Windows.
+**+24.5% mean JCT** vs FCFS (synthetic Pareto, 10-seed median) · **+10–26% on 3 real traces** (Azure, Borg, Helios) · **within 5.1%** of SJF-oracle on BurstGPT · byte-identical reproducibility across macOS + Windows.
 
 ---
 
@@ -45,14 +45,23 @@ None of this has shipped to the Python task-queue layer. Chronoq closes that gap
 
 ---
 
-## Evidence — validated on 4 real workload traces
+## Evidence — validated on 5 real workload traces
 
-| Trace                             | Source                        | Headline                                                    |
-| --------------------------------- | ----------------------------- | ----------------------------------------------------------- |
-| Synthetic Pareto (seeded)         | Generated                     | **+32% mean / +17.5% p99** vs FCFS at ρ=0.7                 |
-| BurstGPT (LLM inference)          | HuggingFace `lzzmm/BurstGPT`  | **Within 5.1% of SJF-oracle** at p99                        |
-| Google Borg 2011 (cluster batch)  | GCS `gs://clusterdata-2011-2` | **+14–22% mean JCT** at ρ ≥ 0.8                             |
-| Azure Functions 2019 (serverless) | `Azure/AzurePublicDataset`    | **+10% mean JCT** (p99 structurally bound on this workload) |
+All experiments: `n_train=800`, `n_eval=300`, 10 seeds [42–51]. Numbers are medians across seeds at ρ=0.7.
+
+| Trace | Source | Mean JCT vs FCFS @ ρ=0.7 | p99 vs FCFS | p99 gap to oracle |
+| --------------------------------- | ----------------------------- | :---: | :---: | :---: |
+| Synthetic Pareto (seeded) | Generated | **+24.5%** | +10.3% | 0.6% |
+| BurstGPT (LLM inference) | HuggingFace `lzzmm/BurstGPT` | +8.6% | −34.2% ¹ | **5.1%** |
+| Google Borg 2011 (cluster batch) | GCS `gs://clusterdata-2011-2` | +1.0% (light load); **+14–22% at ρ≥0.8** | +2.8% | −12.5% ² |
+| Azure Functions 2019 (serverless) | `Azure/AzurePublicDataset` | **+10.0%** | −16.9% ¹ | 16.9% |
+| Helios GPU cluster (SenseTime) | `S-Lab-System-Group/HeliosData` | +6.7% (ρ=0.7); **+21–26% at ρ≥0.8** | −79.0% ¹ | 100.5% ³ |
+
+¹ SJF-family tradeoff: mean JCT improves but long-running jobs at the tail are starved. Pair with aging in production.
+² LambdaRank beats SJF-oracle on p99 at ρ=0.7 on this trace (negative gap = LR is better than oracle).
+³ Extreme starvation on very long-tailed GPU training jobs (hours to days). See BENCHMARKS.md for the full analysis.
+
+> **Workload diversity requirement**: LambdaRank requires meaningfully different per-type duration distributions. On workloads where all task types take similar time (low type-to-type CoV), the ranker cannot improve on FCFS — validate with `ablation_features.py` before production use.
 
 ![Feature importance](docs/assets/ablation_features.png)
 ![Drift recovery](docs/assets/drift_recovery.png)
@@ -109,9 +118,9 @@ scored = ranker.predict_scores([
 
 ## Status & roadmap
 
-- **v0.2.0** (shipping): 4 real-trace validation · multi-seed error bands · multi-worker simulator · Celery integration with eager + Docker demos · byte-identical cross-platform reproducibility
-- **v0.2.1** (next patch): 3 more traces — Philly DL-training · Helios multi-tenant GPU · Mooncake cross-provider LLM (Kimi FAST'25)
-- **v0.3.0** (next minor): SRPT+aging scheduler (bounded p99 starvation) · more cluster / microservice / HPC traces · possible Hatchet or Temporal integration
+- **v0.2.0** (shipped): 4 real-trace validation · multi-seed error bands · multi-worker simulator · Celery integration with eager + Docker demos · byte-identical cross-platform reproducibility
+- **v0.2.1** (shipping): 5-trace benchmark refresh — Helios GPU cluster + Philly DNN (synthetic) full runs · Azure + BurstGPT refreshed to 10 seeds · Mooncake LLM trace · cross-trace summary in BENCHMARKS.md · Helios loader fix (nested zip + branch name)
+- **v0.3.0** (next minor): SRPT+aging scheduler (bounded p99 starvation) · real Philly download via Git LFS · more cluster / microservice / HPC traces · possible Hatchet or Temporal integration
 
 See [`CHANGELOG.md`](CHANGELOG.md) for full release history.
 
