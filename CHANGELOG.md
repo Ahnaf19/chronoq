@@ -10,6 +10,14 @@ _PRs open, pending merge and version bump for v0.2.1._
 - **`chronoq-bench`**: `PhillyLoader` — Microsoft Philly DNN-training cluster trace (MSR, CC-BY 4.0, USENIX ATC 2019). Duration from `submitted_time`→`end_time`, task type from virtual cluster name, `num_gpu` in metadata. CI fixture: synthetic, seeded, 100 rows. (PR #23)
 - **`chronoq-bench`**: `HeliosLoader` — SenseTime Helios multi-tenant GPU cluster trace (CC-BY 4.0, 3.36M jobs). Explicit `duration` column; exposes `queue_time_ms` in `TraceJob.metadata` — unique among all loaders. CI fixture: synthetic, 4 tenants, 100 rows. (PR #24)
 - **`chronoq-bench`**: `MooncakeLoader` — Kimi LLM inference trace (kvcache-ai/Mooncake FAST'25, Apache 2.0). Duration synthesized from token counts (`20.0 + 8.0 × output_tokens`); task type binned from `output_tokens` into `kv_short`/`kv_medium`/`kv_long`. CI fixture: synthetic, stratified, 100 rows. (PR #25)
+- **`chronoq-bench`**: Real-data benchmark refresh — Helios (2.6M real jobs from 4 GPU clusters) and Azure (353K rows, refreshed to 800/300×10 seeds) full runs. Results JSON: `results_helios.json`, `results_azure.json` (refreshed). Helios: +6.7% mean JCT @ ρ=0.7, +21–26% at ρ≥0.8. Azure: +10.0% mean JCT @ ρ=0.7, +15–25% at ρ≥0.8.
+- **`chronoq-bench`**: Cross-trace summary table in `docs/v2/BENCHMARKS.md` — 5 traces (synthetic + 4 real) with consistent columns.
+- **`chronoq-bench`**: Helios Results section in `docs/v2/BENCHMARKS.md` — full mean/p99 tables, exit-criteria gate results, 5 workload observations including the non-monotonic ρ=0.7 anomaly.
+- **`chronoq-bench`**: Philly Results section in `docs/v2/BENCHMARKS.md` — honest synthetic-data disclosure (Git LFS blocks automatic download), −8.9% mean result explained as feature-collapse from homogeneous VC duration distributions.
+
+### Fixed (→ v0.2.1)
+- **`chronoq-bench`**: `HeliosLoader` — fix nested-zip structure (repo zip contains `data.zip`; CSVs are `cluster_log.csv` not `*job*.csv`). (PR this branch)
+- **`chronoq-bench`**: `cache.py` — correct `HELIOS_DOWNLOAD_URL` branch from `main` to `master`. (PR this branch)
 
 ## [0.2.0.post1] — 2026-04-24
 
