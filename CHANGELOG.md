@@ -15,6 +15,8 @@ _PRs open, pending merge and version bump for v0.2.1._
 - **`chronoq-bench`**: Helios Results section in `docs/v2/BENCHMARKS.md` — full mean/p99 tables, exit-criteria gate results, 5 workload observations including the non-monotonic ρ=0.7 anomaly.
 - **`chronoq-bench`**: Philly Results section in `docs/v2/BENCHMARKS.md` — honest synthetic-data disclosure (Git LFS blocks automatic download), −8.9% mean result explained as feature-collapse from homogeneous VC duration distributions.
 
+- **`chronoq-bench`**: Cross-trace comparison chart (`docs/assets/cross_trace_comparison.png`) — publication-quality two-panel grouped bar chart (mean JCT + p99 JCT vs FCFS at ρ=0.7 and ρ=0.8 for all 6 workloads). Embedded in README and BENCHMARKS.md cross-trace summary section.
+
 ### Fixed (→ v0.2.1)
 - **`chronoq-bench`**: `HeliosLoader` — fix nested-zip structure (repo zip contains `data.zip`; CSVs are `cluster_log.csv` not `*job*.csv`). (PR this branch)
 - **`chronoq-bench`**: `cache.py` — correct `HELIOS_DOWNLOAD_URL` branch from `main` to `master`. (PR this branch)
