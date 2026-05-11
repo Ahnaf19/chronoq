@@ -47,6 +47,10 @@ None of this has shipped to the Python task-queue layer. Chronoq closes that gap
 
 ## Evidence — validated on 5 real workload traces
 
+![Cross-trace comparison](docs/assets/cross_trace_comparison.png)
+
+*LambdaRank vs FCFS across 6 workloads — mean JCT improvement (left) and p99 tradeoff (right) at ρ=0.7 and ρ=0.8. Philly's negative result reflects homogeneous VC duration distributions, not a bug.*
+
 All experiments: `n_train=800`, `n_eval=300`, 10 seeds [42–51]. Numbers are medians across seeds at ρ=0.7.
 
 | Trace | Source | Mean JCT vs FCFS @ ρ=0.7 | p99 vs FCFS | p99 gap to oracle |

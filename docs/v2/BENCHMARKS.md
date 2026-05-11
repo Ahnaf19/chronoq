@@ -204,6 +204,10 @@ CHRONOQ_BENCH_SMOKE=1 CHRONOQ_BENCH_OFFLINE=1 uv run python -m chronoq_bench.exp
 
 ## Results — cross-trace summary
 
+![Cross-trace comparison](../../docs/assets/cross_trace_comparison.png)
+
+*Left: mean JCT improvement (%) vs FCFS at ρ=0.7 (light) and ρ=0.8 (solid). Right: p99 JCT improvement — shows the SJF-family tail tradeoff. Green = LambdaRank faster; red = LambdaRank slower. Regenerate: `uv run python -m chronoq_bench.experiments.cross_trace_comparison`.*
+
 All experiments: `n_train=800`, `n_eval=300`, 10 seeds [42–51], load_points=[0.3…0.9]. Metrics are medians across the 10 seeds at ρ=0.7.
 
 | Trace | Data source | Mean JCT vs FCFS @ ρ=0.7 | p99 JCT vs FCFS @ ρ=0.7 | p99 gap to SJF-oracle @ ρ=0.7 | Plot |
